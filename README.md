@@ -7,6 +7,8 @@ A hackathon MVP for independent Indian jewellers. Jewellers record stock by weig
 3. See, in under a second, how many designs have not sold in 12 months and how many grams of gold they hold.
 4. Get a **reorder** list and a **do-not-reorder** list, each item with a reason, and Approve / Edit buttons. Nothing is ever sent to a karigar.
 
+Live demo: https://designledger-neon.vercel.app
+
 Try it without any files: click **Try with sample data (20 photos)**, then **Analyze**.
 
 ## How it works
