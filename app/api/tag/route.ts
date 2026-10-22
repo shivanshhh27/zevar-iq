@@ -38,7 +38,11 @@ export async function POST(request: Request) {
     }
     return Response.json({ tags });
   } catch (e) {
-    const msg = e instanceof GeminiError && e.message.includes("400") ? "The AI rejected this photo or the key. Check the key in .env.local." : "Could not reach the AI for this photo. Try again.";
+    const status = e instanceof GeminiError ? e.status : undefined;
+    const msg =
+      status === 400 || status === 403 ? "The AI rejected this photo or the key. Check the key in .env.local."
+      : status === 429 || status === 503 ? "The AI is busy right now. Press Retry in a moment."
+      : "Could not reach the AI for this photo. Try again.";
     return Response.json({ error: msg }, { status: 502 });
   }
 }
