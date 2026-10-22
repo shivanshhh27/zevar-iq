@@ -20,13 +20,17 @@ export function basicReason(r: DesignRow): string {
 }
 
 function Chip({ children, tone }: { children: React.ReactNode; tone: "bad" | "good" | "plain" }) {
-  return <span className={`chip ${tone === "bad" ? "chip-bad" : tone === "good" ? "chip-good" : ""}`}>{children}</span>;
+  return (
+    <span className={`chip ${tone === "bad" ? "chip-bad" : tone === "good" ? "chip-good" : ""}`} style={tone === "plain" ? { background: "#f1eee6", color: "#5d584c" } : undefined}>
+      {children}
+    </span>
+  );
 }
 
 function Tile({ label, value, tone }: { label: string; value: string; tone?: "bad" | "good" | "gold" }) {
   const colour = tone === "bad" ? "var(--bad)" : tone === "good" ? "var(--good)" : tone === "gold" ? "#a87a24" : "var(--navy-900)";
   return (
-    <div className="rounded-2xl border p-4" style={{ borderColor: "var(--line)", background: "#fbfcfe" }}>
+    <div className="rounded-2xl border p-4" style={{ borderColor: "var(--line)", background: "#fffcf1" }}>
       <div className="text-3xl font-bold tracking-tight" style={{ color: colour }}>
         {value}
       </div>
