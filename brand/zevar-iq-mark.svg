@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1000" width="1000" height="1000">
+  <title>Zevar IQ</title>
+  <polygon points="120,420 330,250 330,420" fill="#EFC063" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="330,250 330,420 500,420" fill="#F8DC92" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="330,250 670,250 500,420" fill="#FFF0C2" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="670,250 500,420 670,420" fill="#F2CD75" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="670,250 670,420 880,420" fill="#D99A2E" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="120,420 330,420 500,840" fill="#C8821F" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="330,420 500,420 500,840" fill="#E0A23D" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="500,420 670,420 500,840" fill="#F0BE58" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="670,420 880,420 500,840" fill="#B9741A" stroke="#ffffff" stroke-opacity="0.55" stroke-width="5" stroke-linejoin="round"/>
+  <polygon points="800,120 816,176 872,192 816,208 800,264 784,208 728,192 784,176" fill="#E1AE24"/>
+</svg>
