@@ -1,10 +1,10 @@
 // Asks Gemini to write a short reason for each design already ranked by our code.
 // If anything fails, the screen falls back to its own plain-text reasons.
 
-import { askGemini } from "@/lib/gemini";
+import { askGemini, GeminiError } from "@/lib/gemini";
 import { REORDER_SYSTEM } from "@/lib/prompts";
 
-type Line = { id: string; list: "reorder" | "do-not-reorder"; category: string; style: string; grams: number; sold: number; quantity: number; idleDays: number };
+type Line = { id: string; list: "reorder" | "do-not-reorder"; category: string; style: string; grams: number; sold: number; quantity: number; idleDays: number; lockedGrams: number; styleSoldPercent: number; categorySoldPercent: number };
 
 export async function POST(request: Request) {
   if (!process.env.GEMINI_API_KEY) return Response.json({ error: "No API key found." }, { status: 500 });
@@ -25,7 +25,10 @@ export async function POST(request: Request) {
     const reasons: Record<string, string> = {};
     for (const l of lines) if (typeof raw[l.id] === "string") reasons[l.id] = raw[l.id];
     return Response.json({ reasons });
-  } catch {
+  } catch (e) {
+    if (e instanceof GeminiError && e.quota) {
+      return Response.json({ error: "The daily limit of the free AI plan has been reached.", code: "quota" }, { status: 429 });
+    }
     return Response.json({ error: "Could not get reasons from the AI." }, { status: 502 });
   }
 }

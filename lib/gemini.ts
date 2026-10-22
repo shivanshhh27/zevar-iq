@@ -6,7 +6,11 @@
 const MODELS = [process.env.GEMINI_MODEL || "gemini-3.5-flash", "gemini-3.5-flash-lite"];
 
 export class GeminiError extends Error {
-  constructor(message: string, public status?: number) {
+  constructor(
+    message: string,
+    public status?: number,
+    public quota = false, // true when the daily free limit is used up (waiting a few seconds will not help)
+  ) {
     super(message);
   }
 }
@@ -25,6 +29,7 @@ export async function askGemini(
   if (!apiKey) throw new GeminiError("NO_KEY");
 
   let last: GeminiError = new GeminiError("Gemini failed");
+  let quotaHit = false;
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await sleep(800 * attempt);
@@ -54,12 +59,18 @@ export async function askGemini(
         const data = await res.json();
         const text: string | undefined = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");
         if (text) return text;
+        console.error("[gemini] empty answer from", model, JSON.stringify(data).slice(0, 300));
         last = new GeminiError("Empty answer", 200);
         continue;
       }
       last = new GeminiError(`Gemini returned ${res.status}`, res.status);
+      if (res.status === 429 && /quota/i.test(await res.text().catch(() => ""))) {
+        quotaHit = true; // daily limit for this model: skip straight to the backup model
+        break;
+      }
       if (res.status !== 429 && res.status !== 503) break; // not a busy signal, so retrying will not help
     }
   }
+  if (quotaHit) throw new GeminiError("Daily limit reached", 429, true);
   throw last;
 }

@@ -59,6 +59,7 @@ export default function Home() {
   const [running, setRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [tagging, setTagging] = useState(""); // progress text while photos are being tagged
+  const [limitHit, setLimitHit] = useState(false); // true when Gemini says the free daily limit is used up
   const [reasons, setReasons] = useState<Reasons>({});
   const [reasonsState, setReasonsState] = useState<"loading" | "ai" | "fallback">("loading");
   const itemsRef = useRef<Item[]>([]);
@@ -121,15 +122,29 @@ export default function Home() {
     setProblems(skipped.length ? [`These files are not photos we can read and were skipped: ${skipped.join(", ")}.`] : []);
   }
 
-  async function tagOne(item: Item) {
-    patch(item.id, { status: "tagging", error: undefined });
+  // Sends up to 5 photos to the AI in ONE request (the free plan allows only a small number of requests per day).
+  async function tagBatch(batch: Item[]) {
+    for (const item of batch) patch(item.id, { status: "tagging", error: undefined });
+    const fail = (message: string) => {
+      for (const item of batch) patch(item.id, { status: "failed", error: message });
+    };
     try {
-      const res = await fetch("/api/tag", { method: "POST", body: JSON.stringify({ image: item.image, mediaType: "image/jpeg" }) });
+      const res = await fetch("/api/tag", {
+        method: "POST",
+        body: JSON.stringify({ photos: batch.map((i) => ({ id: i.id, image: i.image, mediaType: "image/jpeg" })) }),
+      });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      patch(item.id, { status: "done", tags: data.tags });
-    } catch (e) {
-      patch(item.id, { status: "failed", error: e instanceof Error ? e.message : "Could not tag this photo." });
+      if (!res.ok) {
+        if (data.code === "quota") setLimitHit(true);
+        return fail(data.code === "quota" ? "Daily AI limit reached. Tag this one by hand below, or Retry later." : data.error);
+      }
+      for (const item of batch) {
+        const tags = data.results?.[item.id];
+        if (tags) patch(item.id, { status: "done", tags });
+        else patch(item.id, { status: "failed", error: "The AI's answer for this photo could not be read. Review it by hand below." });
+      }
+    } catch {
+      fail("Could not tag this photo. Check your connection and Retry.");
     }
   }
 
@@ -164,7 +179,14 @@ export default function Home() {
     }));
     if (lines.length === 0) return setReasonsState("ai");
     fetch("/api/reorder", { method: "POST", body: JSON.stringify({ lines }) })
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then(async (r) => {
+        const d = await r.json();
+        if (!r.ok) {
+          if (d.code === "quota") setLimitHit(true);
+          throw new Error(d.error);
+        }
+        return d;
+      })
       .then((d) => {
         setReasons(d.reasons);
         setReasonsState("ai");
@@ -175,6 +197,7 @@ export default function Home() {
   async function analyseAll() {
     setSales(null); // never leave old results on screen next to a new run or a new error
     setTagging("");
+    setLimitHit(false);
     const found: string[] = [];
     if (items.length === 0) found.push("Add at least one photo.");
     if (csvText === null) found.push("Add the sales file (CSV).");
@@ -200,15 +223,18 @@ export default function Home() {
     setReasons({});
     setSales(parsed);
 
-    const queue = itemsRef.current.filter((i) => !i.tags);
-    const total = queue.length;
+    // Photos go to the AI 5 at a time, one request per batch; 4 batches (20 photos) run at once.
+    const todo = itemsRef.current.filter((i) => !i.tags);
+    const batches: Item[][] = [];
+    for (let n = 0; n < todo.length; n += 5) batches.push(todo.slice(n, n + 5));
     let done = 0;
-    setTagging(total > 0 ? `Tagging 0 of ${total}` : "");
+    setTagging(todo.length > 0 ? `Tagging 0 of ${todo.length}` : "");
     await Promise.all(
-      Array.from({ length: 8 }, async () => {
-        for (let next = queue.shift(); next; next = queue.shift()) {
-          await tagOne(next);
-          setTagging(`Tagging ${++done} of ${total}`);
+      Array.from({ length: 4 }, async () => {
+        for (let next = batches.shift(); next; next = batches.shift()) {
+          await tagBatch(next);
+          done += next.length;
+          setTagging(`Tagging ${done} of ${todo.length}`);
         }
       }),
     );
@@ -272,7 +298,7 @@ export default function Home() {
                   </div>
                   {i.status === "failed" && (
                     <div className="text-xs text-red-700">
-                      {i.error} <button className="underline" onClick={() => tagOne(i)}>Retry</button>
+                      {i.error} <button className="underline" onClick={() => tagBatch([i])}>Retry</button>
                     </div>
                   )}
                 </div>
@@ -309,6 +335,13 @@ export default function Home() {
           </ul>
         )}
       </div>
+
+      {limitHit && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          The daily limit of the free AI plan has been reached. The stuck-gold banner and the board still work. Photos that could not be tagged can be filled in by hand under
+          &quot;Check the AI&apos;s tags&quot;, and the reasons will be basic. The limit resets every day, or you can turn on billing for your Gemini key.
+        </p>
+      )}
 
       {skipped.length > 0 && (
         <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
