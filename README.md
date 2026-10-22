@@ -13,17 +13,17 @@ Try it without any files: click **Try with sample data (20 photos)**, then **Ana
 
 ## Demo files (for showing the prototype)
 
-All in , and downloadable from the app's step 1 card:
+All in `public/sample/`, and downloadable from the app's step 1 card:
 
 | File | What it is |
 | --- | --- |
-|  | 20 Indian designs: name, ornament type (Necklace, Choker, Kada, Bangle, Earrings, Ring, Pendant, Bracelet), purity, grams, quantity, stock-in date and karigar |
-|  | 16 sales (design_id, date, amount in rupees) |
-|  | The 20 matching photos, D01 to D20 (credits inside) |
+| `designs.csv` | 20 Indian designs: name, ornament type (Necklace, Choker, Kada, Bangle, Earrings, Ring, Pendant, Bracelet), purity, grams, quantity, stock-in date and karigar |
+| `sales.csv` | 16 sales (design_id, date, amount in rupees) |
+| `zevar-demo-photos.zip` | The 20 matching photos, D01 to D20 (credits inside) |
 
-Live demo flow: upload the 20 photos, then  under *Stock list*, then  under *Sales file*, then press **Analyze**. Or just press **Try with sample data**. Either way, 6 designs (243 g of gold) show as stuck.
+Live demo flow: upload the 20 photos, then `designs.csv` under *Stock list*, then `sales.csv` under *Sales file*, then press **Analyze**. Or just press **Try with sample data**. Either way, 6 designs (243 g of gold) show as stuck.
 
- columns: ,  (per piece), ,  are required; , , ,  are optional.
+`designs.csv` columns: `design_id`, `weight_grams` (per piece), `quantity` and `stock_in_date` are required; `design_name`, `ornament_type`, `purity` and `karigar` are optional.
 
 ## How it works
 
