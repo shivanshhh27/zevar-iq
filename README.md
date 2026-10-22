@@ -39,6 +39,8 @@ npm run dev
 
 Open http://localhost:3000. The key lives only in `.env.local`, which git ignores. Never put it in code or commit it.
 
+Run the checks of the maths (no AI, no key needed) with `npm test`.
+
 ## Deploy to Vercel
 
 1. Push this repo to GitHub and import it at [vercel.com/new](https://vercel.com/new).
