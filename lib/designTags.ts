@@ -46,6 +46,28 @@ export type DesignTags = {
 
 export const LOW_CONFIDENCE = 0.6;
 
+// Checks Claude's answer against the menu. Anything off-list returns null,
+// so the screen shows "needs review" instead of trusting a bad answer.
+export function parseTags(raw: unknown): DesignTags | null {
+  if (typeof raw !== "object" || raw === null) return null;
+  const r = raw as Record<string, unknown>;
+  const confidence = Number(r.confidence);
+  if (typeof r.isJewellery !== "boolean" || !Number.isFinite(confidence)) return null;
+  if (!r.isJewellery) {
+    return { isJewellery: false, category: "other", style: "other", priceBand: PRICE_BANDS[0], confidence: Math.min(1, Math.max(0, confidence)) };
+  }
+  if (!(CATEGORIES as readonly unknown[]).includes(r.category)) return null;
+  if (!(STYLES as readonly unknown[]).includes(r.style)) return null;
+  if (!(PRICE_BANDS as readonly unknown[]).includes(r.priceBand)) return null;
+  return {
+    isJewellery: true,
+    category: r.category as Category,
+    style: r.style as Style,
+    priceBand: r.priceBand as PriceBand,
+    confidence: Math.min(1, Math.max(0, confidence)),
+  };
+}
+
 // Weight comes from the owner's form, so plain code (not AI) decides the band.
 export function weightBandFor(grams: number): WeightBand {
   if (grams < 5) return "under 5g";

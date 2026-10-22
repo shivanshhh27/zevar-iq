@@ -10,7 +10,7 @@ export type StockItem = {
   quantity: number; // pieces in stock-in
   karigar: string;
   stockInDate: string; // YYYY-MM-DD
-  tags: DesignTags;
+  tags: DesignTags | null; // null = Claude could not tag this photo yet
 };
 
 export const STUCK_DAYS = 365;
@@ -112,6 +112,6 @@ export function analyse(stock: StockItem[], sales: SaleRow[]): Analysis {
     stuckGrams: stuck.reduce((s, r) => s + r.lockedGrams, 0),
     unmatchedSaleIds,
     byWeightBand: group((r) => r.weightBand),
-    byPriceBand: group((r) => r.tags.priceBand),
+    byPriceBand: group((r) => r.tags?.priceBand ?? "untagged"),
   };
 }
