@@ -293,8 +293,8 @@ export default function Home() {
             <a href="#top" className="flex items-center gap-2.5">
               <Logo />
               <span className="text-lg tracking-tight" style={{ color: "var(--navy-900)" }}>
-                <b className="font-extrabold">Design</b>
-                <span className="font-medium">Ledger</span>
+                <b className="font-extrabold">Zevar</b>
+                <span className="font-medium"> IQ</span>
               </span>
             </a>
             <div className="hidden items-center gap-8 text-sm font-semibold md:flex" style={{ color: "var(--navy-900)" }}>
@@ -314,7 +314,7 @@ export default function Home() {
             <span className="chip chip-gold">Built for independent jewellers in India</span>
             <h1 className="mt-5 text-3xl font-extrabold leading-tight sm:text-5xl">Know which designs sell, and which ones lock up your gold.</h1>
             <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg" style={{ color: "rgba(255,255,255,0.86)" }}>
-              Upload your stock photos and your sales file. DesignLedger shows what has not sold for 12 months and what to reorder from your karigars. You approve every decision.
+              Upload your stock photos and your sales file. Zevar IQ shows what has not sold for 12 months and what to reorder from your karigars. You approve every decision.
             </p>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
               <a href="#try" className="btn btn-primary">
@@ -596,7 +596,7 @@ export default function Home() {
         <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-xs sm:px-6">
           <div className="flex items-center gap-2.5">
             <Logo />
-            <span className="text-sm font-semibold text-white">DesignLedger</span>
+            <span className="text-sm font-semibold text-white">Zevar IQ</span>
             <span>· A hackathon MVP for independent jewellers</span>
           </div>
           <a href="/sample/photos/CREDITS.md" className="underline hover:text-white">

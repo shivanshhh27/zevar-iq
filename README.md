@@ -1,6 +1,6 @@
-# DesignLedger
+# Zevar IQ
 
-A hackathon MVP for independent Indian jewellers. Jewellers record stock by weight, not by design, so they can't see what sells and gold stays locked in designs that don't. DesignLedger fixes that in one screen:
+A hackathon MVP for independent Indian jewellers. Jewellers record stock by weight, not by design, so they can't see what sells and gold stays locked in designs that don't. Zevar IQ fixes that in one screen:
 
 1. Add stock photos (with weight, quantity and stock-in date) and a sales CSV.
 2. Press **Analyze**.

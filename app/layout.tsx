@@ -9,7 +9,7 @@ const montserrat = Montserrat({
 });
 
 export const metadata: Metadata = {
-  title: "DesignLedger",
+  title: "Zevar IQ",
   description: "See which jewellery designs sell and which are stuck, and what to reorder from your karigars.",
 };
 
