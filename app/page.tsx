@@ -61,6 +61,7 @@ export default function Home() {
   const [tagging, setTagging] = useState(""); // progress text while photos are being tagged
   const [photosOpen, setPhotosOpen] = useState(true); // the photo grid is open while setting up, and folds away once results show
   const [tagsOpen, setTagsOpen] = useState(false);
+  const [noKey, setNoKey] = useState(false); // true when the server has no GEMINI_API_KEY
   const [limitHit, setLimitHit] = useState(false); // true when Gemini says the free daily limit is used up
   const [reasons, setReasons] = useState<Reasons>({});
   const [reasonsState, setReasonsState] = useState<"loading" | "ai" | "fallback">("loading");
@@ -140,6 +141,7 @@ export default function Home() {
       const data = await res.json();
       if (!res.ok) {
         if (data.code === "quota") setLimitHit(true);
+        if (data.code === "nokey") setNoKey(true);
         return fail(data.code === "quota" ? "Daily AI limit reached. Tag this one by hand below, or Retry later." : data.error);
       }
       for (const item of batch) {
@@ -202,6 +204,7 @@ export default function Home() {
     setSales(null); // never leave old results on screen next to a new run or a new error
     setTagging("");
     setLimitHit(false);
+    setNoKey(false);
     const found: string[] = [];
     if (items.length === 0) found.push("Add at least one photo.");
     if (csvText === null) found.push("Add the sales file (CSV).");
@@ -319,6 +322,13 @@ export default function Home() {
           )}
         </div>
       </section>
+
+      {noKey && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          The AI is not set up on this server yet, so photos are not tagged and the reasons are basic. The stuck-gold banner and the board still work. The site owner needs to add
+          GEMINI_API_KEY (Vercel: Settings, then Environment Variables) and redeploy.
+        </p>
+      )}
 
       {limitHit && (
         <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
