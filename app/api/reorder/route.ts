@@ -10,7 +10,7 @@ import { REORDER_SYSTEM } from "@/lib/prompts";
 type Line = { id: string; list: "reorder" | "do-not-reorder"; category: string; style: string; grams: number; sold: number; quantity: number; idleDays: number; lockedGrams: number; styleSoldPercent: number; categorySoldPercent: number };
 
 export async function POST(request: Request) {
-  if (!process.env.GEMINI_API_KEY) return Response.json({ error: "No API key found." }, { status: 500 });
+  if (!process.env.GEMINI_API_KEY) return Response.json({ error: "No AI key is set up on the server." }, { status: 500 });
 
   let lines: Line[];
   try {

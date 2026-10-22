@@ -34,7 +34,7 @@ type Photo = { id: string; image: string; mediaType: string };
 export async function POST(request: Request) {
   if (!process.env.GEMINI_API_KEY) {
     return Response.json(
-      { error: "No API key found. Add GEMINI_API_KEY to the .env.local file and restart the app." },
+      { error: "No AI key is set up on the server. Add GEMINI_API_KEY (in .env.local on your computer, or under Environment Variables in Vercel) and restart or redeploy." },
       { status: 500 },
     );
   }
