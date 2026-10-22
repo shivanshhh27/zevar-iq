@@ -28,21 +28,28 @@ export async function askGemini(
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await sleep(800 * attempt);
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: system }] },
-          contents: [{ role: "user", parts }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            ...(schema ? { responseSchema: schema } : {}),
-            maxOutputTokens,
-            temperature: 0.2,
-            thinkingConfig: { thinkingLevel: "minimal" },
-          },
-        }),
-      });
+      let res: Response;
+      try {
+        res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+          signal: AbortSignal.timeout(20_000), // a call that hangs is cut off and retried instead of stalling the screen
+          body: JSON.stringify({
+            systemInstruction: { parts: [{ text: system }] },
+            contents: [{ role: "user", parts }],
+            generationConfig: {
+              responseMimeType: "application/json",
+              ...(schema ? { responseSchema: schema } : {}),
+              maxOutputTokens,
+              temperature: 0.2,
+              thinkingConfig: { thinkingLevel: "minimal" },
+            },
+          }),
+        });
+      } catch {
+        last = new GeminiError("Timed out", 504);
+        continue;
+      }
       if (res.ok) {
         const data = await res.json();
         const text: string | undefined = data?.candidates?.[0]?.content?.parts?.map((p: { text?: string }) => p.text ?? "").join("");

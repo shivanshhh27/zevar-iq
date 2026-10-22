@@ -22,11 +22,11 @@ type Item = {
   edited?: boolean;
 };
 
-// Shrinks a photo to 1024px so uploads are fast and cheap. Returns null if the file can't be read as an image.
+// Shrinks a photo to 768px so uploads are fast and cheap. Returns null if the file can't be read as an image.
 async function shrink(file: File): Promise<{ preview: string; image: string } | null> {
   try {
     const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
+    const scale = Math.min(1, 768 / Math.max(bitmap.width, bitmap.height));
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(bitmap.width * scale);
     canvas.height = Math.round(bitmap.height * scale);
@@ -57,8 +57,8 @@ export default function Home() {
   const [sales, setSales] = useState<SaleRow[] | null>(null);
   const [problems, setProblems] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
-  const [progress, setProgress] = useState("");
   const [seconds, setSeconds] = useState(0);
+  const [tagging, setTagging] = useState(""); // progress text while photos are being tagged
   const [reasons, setReasons] = useState<Reasons>({});
   const [reasonsState, setReasonsState] = useState<"loading" | "ai" | "fallback">("loading");
   const itemsRef = useRef<Item[]>([]);
@@ -68,6 +68,40 @@ export default function Home() {
     setItems(next);
   };
   const patch = (id: string, change: Partial<Item>) => update(itemsRef.current.map((i) => (i.id === id ? { ...i, ...change } : i)));
+
+  // Lets the owner fix a design ID so it matches the sales file (it starts as the photo's file name).
+  function renameId(oldId: string, raw: string) {
+    const id = raw.trim();
+    if (!id || id === oldId) return;
+    if (itemsRef.current.some((i) => i.id === id)) {
+      setProblems([`Design ID ${id} is already used by another photo.`]);
+      return;
+    }
+    update(itemsRef.current.map((i) => (i.id === oldId ? { ...i, id } : i)));
+  }
+
+  // One click fills the form with the 20 sample photos, their weights and dates, and the sample sales file.
+  async function loadSample() {
+    setSales(null);
+    setProblems([]);
+    setTagging("");
+    try {
+      const stock: { id: string; weightGrams: number; quantity: number; stockInDate: string }[] = await (await fetch("/sample/stock.json")).json();
+      const loaded = await Promise.all(
+        stock.map(async (s) => {
+          const file = new File([await (await fetch(`/sample/photos/${s.id}.jpg`)).blob()], `${s.id}.jpg`, { type: "image/jpeg" });
+          const small = await shrink(file);
+          if (!small) throw new Error(s.id);
+          return { id: s.id, ...small, weight: String(s.weightGrams), qty: String(s.quantity), date: s.stockInDate, status: "waiting" } as Item;
+        }),
+      );
+      update(loaded);
+      setCsvText(await (await fetch("/sample/sales.csv")).text());
+      setCsvName("sales.csv (sample)");
+    } catch {
+      setProblems(["Could not load the sample data. Refresh the page and try again."]);
+    }
+  }
 
   async function addPhotos(files: FileList | null) {
     if (!files) return;
@@ -101,6 +135,20 @@ export default function Home() {
 
   // Asks the AI for a reason per design (once per run). If it fails, the screen shows basic reasons.
   function requestReasons(result: ReturnType<typeof analyse>) {
+    // How well each style / category sells across the whole shop, so reasons can compare a design with its peers.
+    const share = (key: (r: (typeof result.rows)[number]) => string) => {
+      const totals = new Map<string, { sold: number; pieces: number }>();
+      for (const r of result.rows) {
+        const t = totals.get(key(r)) ?? { sold: 0, pieces: 0 };
+        totals.set(key(r), { sold: t.sold + Math.min(r.sold, r.quantity), pieces: t.pieces + r.quantity });
+      }
+      return (r: (typeof result.rows)[number]) => {
+        const t = totals.get(key(r))!;
+        return Math.round((t.sold / t.pieces) * 100);
+      };
+    };
+    const styleShare = share((r) => r.tags?.style ?? "unknown");
+    const categoryShare = share((r) => r.tags?.category ?? "unknown");
     const lines = [...result.reorder, ...result.stuck].map((r) => ({
       id: r.id,
       list: r.stuck ? "do-not-reorder" : "reorder",
@@ -110,6 +158,9 @@ export default function Home() {
       sold: r.sold,
       quantity: r.quantity,
       idleDays: r.idleDays,
+      lockedGrams: Math.round(r.lockedGrams * 10) / 10,
+      styleSoldPercent: styleShare(r),
+      categorySoldPercent: categoryShare(r),
     }));
     if (lines.length === 0) return setReasonsState("ai");
     fetch("/api/reorder", { method: "POST", body: JSON.stringify({ lines }) })
@@ -122,6 +173,8 @@ export default function Home() {
   }
 
   async function analyseAll() {
+    setSales(null); // never leave old results on screen next to a new run or a new error
+    setTagging("");
     const found: string[] = [];
     if (items.length === 0) found.push("Add at least one photo.");
     if (csvText === null) found.push("Add the sales file (CSV).");
@@ -139,31 +192,31 @@ export default function Home() {
     setProblems(found);
     if (found.length > 0 || !parsed) return;
 
+    // The stuck-gold banner only needs weights, dates and sales, not the AI, so show it straight away.
+    // Photo tagging then runs in the background and fills in styles and price bands as it goes.
     const start = clock.now();
     setRunning(true);
-    setSales(null);
     setReasonsState("loading");
     setReasons({});
+    setSales(parsed);
 
-    // Tag 5 photos at a time.
     const queue = itemsRef.current.filter((i) => !i.tags);
     const total = queue.length;
     let done = 0;
-    setProgress(`Tagging 0 of ${total}`);
+    setTagging(total > 0 ? `Tagging 0 of ${total}` : "");
     await Promise.all(
-      Array.from({ length: 5 }, async () => {
+      Array.from({ length: 8 }, async () => {
         for (let next = queue.shift(); next; next = queue.shift()) {
           await tagOne(next);
-          setProgress(`Tagging ${++done} of ${total}`);
+          setTagging(`Tagging ${++done} of ${total}`);
         }
       }),
     );
 
-    setSales(parsed);
-    requestReasons(analyse(toStock(itemsRef.current), parsed));
+    setTagging("");
     setSeconds(Math.round((clock.now() - start) / 1000));
     setRunning(false);
-    setProgress("");
+    requestReasons(analyse(toStock(itemsRef.current), parsed));
   }
 
   const analysis = useMemo(() => (sales ? analyse(toStock(items), sales) : null), [sales, items]);
@@ -182,14 +235,30 @@ export default function Home() {
 
       <section className="space-y-3 rounded-lg border p-4">
         <h2 className="font-semibold">1. Stock photos</h2>
-        <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
+        <div className="flex flex-wrap items-center gap-3">
+          <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
+          <button className="rounded border px-3 py-1 text-sm" onClick={loadSample} disabled={running}>
+            Try with sample data (20 photos)
+          </button>
+        </div>
         {items.length > 0 && (
           <ul className="grid gap-3 sm:grid-cols-2">
             {items.map((i) => (
               <li key={i.id} className="flex gap-3 rounded border p-2">
                 <img src={i.preview} alt={i.id} className="h-20 w-20 rounded object-cover" />
                 <div className="flex-1 space-y-1 text-sm">
-                  <div className="font-medium">{i.id}</div>
+                  <label className="block">
+                    Design ID{" "}
+                    <input
+                      key={i.id}
+                      className="w-24 rounded border px-1 py-0.5 text-sm font-medium"
+                      defaultValue={i.id}
+                      onBlur={(e) => {
+                        renameId(i.id, e.target.value);
+                        e.target.value = i.id;
+                      }}
+                    />
+                  </label>
                   <div className="flex flex-wrap gap-2">
                     <label>
                       Grams <input className={field} inputMode="decimal" value={i.weight} onChange={(e) => patch(i.id, { weight: e.target.value })} />
@@ -215,7 +284,7 @@ export default function Home() {
 
       <section className="space-y-2 rounded-lg border p-4">
         <h2 className="font-semibold">2. Sales file</h2>
-        <p className="text-xs text-zinc-500">CSV with columns design_id, date, amount. design_id must match the photo file name (without .jpg).</p>
+        <p className="text-xs text-zinc-500">CSV with columns design_id, date, amount. design_id must match the Design ID on each photo (it starts as the file name; you can edit it).</p>
         <input
           type="file"
           accept=".csv,text/csv"
@@ -230,7 +299,7 @@ export default function Home() {
 
       <div className="space-y-2">
         <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-50" disabled={running} onClick={analyseAll}>
-          {running ? progress || "Working…" : "Analyze"}
+          {running ? tagging || "Working…" : "Analyze"}
         </button>
         {problems.length > 0 && (
           <ul className="list-disc rounded bg-red-50 p-3 pl-7 text-sm text-red-800">
@@ -254,7 +323,8 @@ export default function Home() {
             <p className="text-xs text-zinc-500">Amber means the AI was not sure. Change anything that looks wrong; results update straight away.</p>
             <ul className="grid gap-2 sm:grid-cols-2">
               {items.filter((i) => i.tags?.isJewellery !== false).map((i) => {
-                const unsure = !i.edited && (!i.tags || i.tags.confidence < LOW_CONFIDENCE);
+                const pending = !i.tags && (i.status === "waiting" || i.status === "tagging"); // still being tagged in the background
+                const unsure = !pending && !i.edited && (!i.tags || i.tags.confidence < LOW_CONFIDENCE);
                 const set = (change: Partial<DesignTags>) =>
                   patch(i.id, {
                     edited: true,
@@ -265,7 +335,7 @@ export default function Home() {
                     <img src={i.preview} alt={i.id} className="h-14 w-14 rounded object-cover" />
                     <div className="space-y-1">
                       <div className="font-medium">
-                        {i.id} {unsure && <span className="text-amber-800">· needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}</span>}
+                        {i.id} {pending && <span className="text-zinc-500">· tagging…</span>}{unsure && <span className="text-amber-800">· needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}</span>}
                         {i.edited && <span className="text-zinc-500"> · edited by you</span>}
                       </div>
                       <div className="flex flex-wrap gap-1">
@@ -288,7 +358,7 @@ export default function Home() {
               })}
             </ul>
           </section>
-          <Results analysis={analysis} thumbs={thumbs} reasons={reasons} reasonsState={reasonsState} seconds={seconds} />
+          <Results analysis={analysis} thumbs={thumbs} reasons={reasons} reasonsState={reasonsState} tagging={tagging} seconds={seconds} excludedIds={skipped.map((i) => i.id)} />
         </>
       )}
     </main>

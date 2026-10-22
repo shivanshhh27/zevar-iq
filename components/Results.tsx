@@ -68,13 +68,17 @@ export default function Results({
   thumbs,
   reasons,
   reasonsState,
+  tagging,
   seconds,
+  excludedIds,
 }: {
   analysis: Analysis;
   thumbs: Record<string, string>;
   reasons: Reasons;
   reasonsState: "loading" | "ai" | "fallback";
-  seconds: number;
+  tagging: string; // e.g. "Tagging 7 of 20", or "" when all photos are done
+  seconds: number; // how long tagging took (shown once it is done)
+  excludedIds: string[]; // photos the AI said are not jewellery
 }) {
   // What the owner has done to each list item. Nothing is sent anywhere.
   const [placement, setPlacement] = useState<Record<string, Placement>>({});
@@ -86,6 +90,9 @@ export default function Results({
   const candidates = analysis.rows.filter((r) => r.stuck || reorderIds.has(r.id) || placement[r.id]);
   const reorder = candidates.filter((r) => listOf(r) === "reorder");
   const dont = candidates.filter((r) => listOf(r) === "do-not-reorder");
+
+  const noPhoto = analysis.unmatchedSaleIds.filter((id) => !excludedIds.includes(id));
+  const notJewellery = analysis.unmatchedSaleIds.filter((id) => excludedIds.includes(id));
 
   const renderItem = (r: DesignRow) => {
     const here = listOf(r);
@@ -123,19 +130,26 @@ export default function Results({
 
   return (
     <section className="space-y-6">
-      <div className="rounded-lg border-2 border-red-200 bg-red-50 p-4">
+      <div className={`rounded-lg border-2 p-4 ${analysis.stuck.length > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
         <p className="text-lg font-semibold">
-          {analysis.stuck.length} {analysis.stuck.length === 1 ? "design holds" : "designs hold"} {g(analysis.stuckGrams)} of gold and{" "}
-          {analysis.stuck.length === 1 ? "hasn't" : "haven't"} sold in {Math.round(STUCK_DAYS / 30)} months.
+          {analysis.stuck.length === 0
+            ? `No design has gone unsold for ${Math.round(STUCK_DAYS / 30)} months, so no gold is stuck in this stock.`
+            : `${analysis.stuck.length} ${analysis.stuck.length === 1 ? "design holds" : "designs hold"} ${g(analysis.stuckGrams)} of gold and ${analysis.stuck.length === 1 ? "hasn't" : "haven't"} sold in ${Math.round(STUCK_DAYS / 30)} months.`}
         </p>
         <p className="text-sm text-zinc-600">
-          Based only on the sales file you uploaded (up to {analysis.asOf}). Check the stock in your shop before acting. Finished in {seconds} {seconds === 1 ? "second" : "seconds"}.
+          Based only on the sales file you uploaded (up to {analysis.asOf}). Check the stock in your shop before acting.{" "}
+          {tagging ? `${tagging}… the board below fills in as photos are tagged.` : `Photos tagged in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`}
         </p>
       </div>
 
-      {analysis.unmatchedSaleIds.length > 0 && (
+      {noPhoto.length > 0 && (
         <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          These design_id values in the sales file match no photo, so they were ignored: {analysis.unmatchedSaleIds.join(", ")}.
+          These design_id values in the sales file match none of your photos, so they were ignored: {noPhoto.join(", ")}.
+        </p>
+      )}
+      {notJewellery.length > 0 && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          Sales for {notJewellery.join(", ")} were ignored because the AI did not see jewellery in that photo.
         </p>
       )}
 
@@ -186,7 +200,7 @@ export default function Results({
         </div>
       </div>
       <p className="text-xs text-zinc-500">
-        {reasonsState === "loading" && "Asking the AI for reasons… (basic reasons shown meanwhile)"}
+        {reasonsState === "loading" && (tagging ? "Basic reasons shown; the AI writes better ones once all photos are tagged. " : "Asking the AI for reasons… (basic reasons shown meanwhile) ")}
         {reasonsState === "fallback" && "The AI's reasons were not available, so basic reasons are shown. "}
         Nothing here is sent to a karigar.
       </p>

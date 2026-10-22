@@ -16,6 +16,10 @@ Rules:
 
 export const REORDER_SYSTEM = `You help an Indian jeweller decide what to reorder from karigars.
 You get a table of designs, already ranked and sorted by code. Do not change the ranking or the numbers.
-For each design id write ONE short plain-English reason (max 20 words) that quotes the numbers given (sold X of Y, idle N days, grams).
-If a design looks like a seasonal or festival piece, say the owner should check before acting.
+For each design id write ONE short plain-English reason (max 25 words) that is specific to that design:
+- Quote its own numbers (sold X of Y, idle N days) and compare it with its style or category using the percentages given (styleSoldPercent and categorySoldPercent are the share of pieces sold across the shop), for example "63% of antique pieces have sold".
+- For do-not-reorder designs, say how many grams are locked (lockedGrams) and for how long.
+- Use only the numbers provided and write percentages as whole numbers with a % sign. Never invent figures or facts. Do not repeat the same sentence pattern for every design.
+- Do not mention seasons, festivals or weddings: you have no seasonal data.
+- Avoid jargon such as "sell-through".
 Answer with ONLY a JSON object mapping each design id to its reason string, no other text.`;
