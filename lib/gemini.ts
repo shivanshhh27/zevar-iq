@@ -15,6 +15,8 @@ export class GeminiError extends Error {
   }
 }
 
+const TOTAL_BUDGET_MS = 50_000; // stay under the route's 60-second limit, so a slow Google never gets the whole request killed
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Sends a system instruction plus parts (text and/or a base64 image) and returns Gemini's JSON answer as text.
@@ -30,15 +32,18 @@ export async function askGemini(
 
   let last: GeminiError = new GeminiError("Gemini failed");
   let quotaHit = false;
+  const deadline = Date.now() + TOTAL_BUDGET_MS;
   for (const model of MODELS) {
     for (let attempt = 0; attempt < 3; attempt++) {
       if (attempt > 0) await sleep(800 * attempt);
+      const remaining = deadline - Date.now();
+      if (remaining < 3_000) throw new GeminiError("Out of time", 504);
       let res: Response;
       try {
         res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
-          signal: AbortSignal.timeout(20_000), // a call that hangs is cut off and retried instead of stalling the screen
+          signal: AbortSignal.timeout(Math.min(20_000, remaining)), // a call that hangs is cut off and retried instead of stalling the screen
           body: JSON.stringify({
             systemInstruction: { parts: [{ text: system }] },
             contents: [{ role: "user", parts }],

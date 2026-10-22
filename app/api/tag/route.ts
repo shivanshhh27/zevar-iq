@@ -2,6 +2,9 @@
 // Receives up to 5 photos at once, asks Gemini to tag them in ONE request, checks each answer, sends them back.
 // Batching keeps us well inside the free plan's daily request limit: 20 photos need only 4 requests.
 
+// Vercel stops a request after this many seconds (the free plan allows up to 60).
+export const maxDuration = 60;
+
 import { askGemini, GeminiError } from "@/lib/gemini";
 import { CATEGORIES, DesignTags, PRICE_BANDS, STYLES, parseTags } from "@/lib/designTags";
 import { TAG_SYSTEM } from "@/lib/prompts";

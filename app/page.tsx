@@ -282,7 +282,7 @@ export default function Home() {
               Try with sample data (20 photos)
             </button>
           </div>
-          {items.length > 0 && (
+          {items.length > 0 && !csvName.includes("(sample)") && (
             <p className="text-xs text-zinc-500">
               {items.length} photos added. Set grams, quantity and stock-in date for each under &quot;Photos and details&quot; below.
             </p>

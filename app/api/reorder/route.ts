@@ -1,6 +1,9 @@
 // Asks Gemini to write a short reason for each design already ranked by our code.
 // If anything fails, the screen falls back to its own plain-text reasons.
 
+// Vercel stops a request after this many seconds (the free plan allows up to 60).
+export const maxDuration = 60;
+
 import { askGemini, GeminiError } from "@/lib/gemini";
 import { REORDER_SYSTEM } from "@/lib/prompts";
 
