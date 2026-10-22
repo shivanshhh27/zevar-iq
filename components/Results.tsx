@@ -127,10 +127,11 @@ export default function Results({
           <div className="flex flex-wrap items-center gap-2">
             <span className="font-bold" style={{ color: "var(--ink)" }}>
               {r.id}
+              {r.name ? ` · ${r.name}` : ""}
             </span>
             {r.tags && (
               <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
-                · {r.tags.category}, {r.tags.style}
+                · {r.ornament || r.tags.category}, {r.tags.style}
               </span>
             )}
             {approved[r.id] && <Chip tone="good">Approved</Chip>}
@@ -247,6 +248,11 @@ export default function Results({
                   <tr key={r.id}>
                     <td className="font-bold" style={{ color: "var(--ink)" }}>
                       {r.id}
+                      {r.name && (
+                        <div className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                          {r.name}
+                        </div>
+                      )}
                     </td>
                     <td>{g(r.weightGrams)}</td>
                     <td>

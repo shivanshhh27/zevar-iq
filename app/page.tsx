@@ -7,7 +7,8 @@ import { useMemo, useRef, useState } from "react";
 import Results, { Reasons } from "@/components/Results";
 import { analyse, StockItem } from "@/lib/analysis";
 import { parseSalesCsv, SaleRow } from "@/lib/csv";
-import { CATEGORIES, DesignTags, LOW_CONFIDENCE, PRICE_BANDS, STYLES } from "@/lib/designTags";
+import { Category, CATEGORIES, DesignTags, LOW_CONFIDENCE, PRICE_BANDS, STYLES } from "@/lib/designTags";
+import { categoryForOrnament, parseStockCsv, StockRow } from "@/lib/stockCsv";
 
 type Item = {
   id: string; // file name without extension; must match design_id in the sales file
@@ -20,6 +21,10 @@ type Item = {
   error?: string;
   tags?: DesignTags;
   edited?: boolean;
+  name?: string; // from the stock list, e.g. "Lakshmi Kasu Mala"
+  ornament?: string; // from the stock list, e.g. "Necklace"
+  karigar?: string;
+  ornamentCategory?: Category; // the category the stock list's ornament type maps to; it wins over the AI's guess
 };
 
 // Shrinks a photo to 768px so uploads are fast and cheap. Returns null if the file can't be read as an image.
@@ -47,7 +52,16 @@ const validDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(
 function toStock(items: Item[]): StockItem[] {
   return items
     .filter((i) => i.tags?.isJewellery !== false)
-    .map((i) => ({ id: i.id, weightGrams: Number(i.weight), quantity: Number(i.qty), karigar: "", stockInDate: i.date, tags: i.tags ?? null }));
+    .map((i) => ({
+      id: i.id,
+      weightGrams: Number(i.weight),
+      quantity: Number(i.qty),
+      karigar: i.karigar ?? "",
+      name: i.name,
+      ornament: i.ornament,
+      stockInDate: i.date,
+      tags: i.tags ?? null,
+    }));
 }
 
 // The logo mark: a faceted gem in gold, drawn inline so it needs no image file.
@@ -103,7 +117,7 @@ function HeroArt() {
           <span className="chip chip-gold">Sample data</span>
         </div>
         <div className="mt-2 text-4xl font-extrabold" style={{ color: "var(--ink)" }}>
-          70.9 <span className="text-lg font-bold">g</span>
+          243 <span className="text-lg font-bold">g</span>
         </div>
         <div className="text-xs" style={{ color: "var(--muted)" }}>
           6 designs unsold for 12 months
@@ -155,12 +169,70 @@ export default function Home() {
   const [reasons, setReasons] = useState<Reasons>({});
   const [reasonsState, setReasonsState] = useState<"loading" | "ai" | "fallback">("loading");
   const itemsRef = useRef<Item[]>([]);
+  const stockRowsRef = useRef<StockRow[]>([]); // the uploaded stock list, kept so photos added later can be filled in too
+  const [stockName, setStockName] = useState("");
+  const [stockNote, setStockNote] = useState("");
 
   const update = (next: Item[]) => {
     itemsRef.current = next;
     setItems(next);
   };
   const patch = (id: string, change: Partial<Item>) => update(itemsRef.current.map((i) => (i.id === id ? { ...i, ...change } : i)));
+
+  // Fills in grams, quantity, date, name and ornament type from the stock list.
+  // `onlyIds` limits it to some photos, so it never overwrites what the owner typed for the others.
+  function applyStock(rows: StockRow[], onlyIds?: string[]) {
+    const byId = new Map(rows.map((r) => [r.id.toLowerCase(), r]));
+    const used = new Set<string>();
+    const next = itemsRef.current.map((i) => {
+      const r = byId.get(i.id.toLowerCase());
+      if (!r || (onlyIds && !onlyIds.includes(i.id))) return i;
+      used.add(r.id.toLowerCase());
+      const cat = categoryForOrnament(r.ornament);
+      return {
+        ...i,
+        weight: String(r.weightGrams),
+        qty: String(r.quantity),
+        date: r.stockInDate,
+        name: r.name || undefined,
+        ornament: r.ornament || undefined,
+        karigar: r.karigar || undefined,
+        ornamentCategory: cat,
+        tags: i.tags && cat ? { ...i.tags, category: cat } : i.tags,
+      };
+    });
+    update(next);
+    if (onlyIds) return;
+    const noRow = next.filter((i) => !byId.has(i.id.toLowerCase())).map((i) => i.id);
+    const noPhoto = rows.filter((r) => !used.has(r.id.toLowerCase())).length;
+    setStockNote(
+      next.length === 0
+        ? `${rows.length} designs loaded. They fill in each photo's details as you add photos.`
+        : `Filled in ${used.size} of ${next.length} photos from the stock list.` +
+            (noRow.length ? ` No row for: ${noRow.join(", ")}.` : "") +
+            (noPhoto ? ` ${noPhoto} list ${noPhoto === 1 ? "row has" : "rows have"} no photo yet.` : ""),
+    );
+  }
+
+  async function onStockFile(file: File | undefined) {
+    setStockNote("");
+    if (!file) {
+      stockRowsRef.current = [];
+      setStockName("");
+      return;
+    }
+    const result = parseStockCsv(await file.text());
+    if (!result.ok) {
+      stockRowsRef.current = [];
+      setStockName("");
+      setProblems([result.error]);
+      return;
+    }
+    stockRowsRef.current = result.rows;
+    setStockName(file.name);
+    setProblems([]);
+    applyStock(result.rows);
+  }
 
   // Lets the owner fix a design ID so it matches the sales file (it starts as the photo's file name).
   function renameId(oldId: string, raw: string) {
@@ -171,6 +243,7 @@ export default function Home() {
       return;
     }
     update(itemsRef.current.map((i) => (i.id === oldId ? { ...i, id } : i)));
+    if (stockRowsRef.current.length) applyStock(stockRowsRef.current, [id]);
   }
 
   // One click fills the form with the 20 sample photos, their weights and dates, and the sample sales file.
@@ -180,16 +253,31 @@ export default function Home() {
     setProblems([]);
     setTagging("");
     try {
-      const stock: { id: string; weightGrams: number; quantity: number; stockInDate: string }[] = await (await fetch("/sample/stock.json")).json();
+      const parsed = parseStockCsv(await (await fetch("/sample/designs.csv")).text());
+      if (!parsed.ok) throw new Error(parsed.error);
       const loaded = await Promise.all(
-        stock.map(async (s) => {
-          const file = new File([await (await fetch(`/sample/photos/${s.id}.jpg`)).blob()], `${s.id}.jpg`, { type: "image/jpeg" });
+        parsed.rows.map(async (r) => {
+          const file = new File([await (await fetch(`/sample/photos/${r.id}.jpg`)).blob()], `${r.id}.jpg`, { type: "image/jpeg" });
           const small = await shrink(file);
-          if (!small) throw new Error(s.id);
-          return { id: s.id, ...small, weight: String(s.weightGrams), qty: String(s.quantity), date: s.stockInDate, status: "waiting" } as Item;
+          if (!small) throw new Error(r.id);
+          return {
+            id: r.id,
+            ...small,
+            weight: String(r.weightGrams),
+            qty: String(r.quantity),
+            date: r.stockInDate,
+            name: r.name || undefined,
+            ornament: r.ornament || undefined,
+            karigar: r.karigar || undefined,
+            ornamentCategory: categoryForOrnament(r.ornament),
+            status: "waiting",
+          } as Item;
         }),
       );
       update(loaded);
+      stockRowsRef.current = parsed.rows;
+      setStockName("designs.csv (sample)");
+      setStockNote(`Filled in ${loaded.length} of ${loaded.length} photos from the stock list.`);
       setCsvText(await (await fetch("/sample/sales.csv")).text());
       setCsvName("sales.csv (sample)");
     } catch {
@@ -212,6 +300,7 @@ export default function Home() {
       added.push({ id, ...small, weight: "", qty: "1", date: "", status: "waiting" });
     }
     update([...itemsRef.current, ...added]);
+    if (stockRowsRef.current.length) applyStock(stockRowsRef.current, added.map((i) => i.id));
     setPhotosOpen(true);
     setProblems(skipped.length ? [`These files are not photos we can read and were skipped: ${skipped.join(", ")}.`] : []);
   }
@@ -234,7 +323,9 @@ export default function Home() {
         return fail(data.code === "quota" ? "Daily AI limit reached. Tag this one by hand below, or Retry later." : data.error);
       }
       for (const item of batch) {
-        const tags = data.results?.[item.id];
+        const base = data.results?.[item.id];
+        const forced = itemsRef.current.find((i) => i.id === item.id)?.ornamentCategory;
+        const tags = base && forced ? { ...base, category: forced } : base;
         if (tags) patch(item.id, { status: "done", tags });
         else patch(item.id, { status: "failed", error: "The AI's answer for this photo could not be read. Review it by hand below." });
       }
@@ -261,6 +352,8 @@ export default function Home() {
     const categoryShare = share((r) => r.tags?.category ?? "unknown");
     const lines = [...result.reorder, ...result.stuck].map((r) => ({
       id: r.id,
+      name: r.name,
+      ornament: r.ornament,
       list: r.stuck ? "do-not-reorder" : "reorder",
       category: r.tags?.category ?? "unknown",
       style: r.tags?.style ?? "unknown",
@@ -476,7 +569,37 @@ export default function Home() {
                     Try with sample data (20 photos)
                   </button>
                 </div>
-                {items.length > 0 && !csvName.includes("(sample)") && (
+                <div className="mt-5 rounded-xl p-4" style={{ background: "var(--cream)" }}>
+                  <div className="text-sm font-bold" style={{ color: "var(--ink)" }}>
+                    Stock list (optional)
+                  </div>
+                  <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
+                    CSV with design_id, weight_grams, quantity, stock_in_date, and optionally design_name, ornament_type, purity and karigar. It fills in every photo at once.
+                  </p>
+                  <div className="mt-3">
+                    <input type="file" accept=".csv,text/csv" onChange={(e) => onStockFile(e.target.files?.[0])} />
+                  </div>
+                  {stockName && (
+                    <p className="mt-2 text-xs font-semibold" style={{ color: "var(--good)" }}>
+                      ✓ {stockName}. {stockNote}
+                    </p>
+                  )}
+                  <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
+                    Need demo files?{" "}
+                    <a className="font-bold underline" href="/sample/designs.csv" download>
+                      designs.csv
+                    </a>
+                    {" · "}
+                    <a className="font-bold underline" href="/sample/sales.csv" download>
+                      sales.csv
+                    </a>
+                    {" · "}
+                    <a className="font-bold underline" href="/sample/zevar-demo-photos.zip" download>
+                      20 demo photos (.zip)
+                    </a>
+                  </p>
+                </div>
+                {items.length > 0 && !csvName.includes("(sample)") && !stockName && (
                   <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
                     {items.length} photos added. Set grams, quantity and stock-in date for each under &quot;Photos and details&quot; below.
                   </p>
@@ -584,6 +707,14 @@ export default function Home() {
                   <li key={i.id} className="flex gap-3 rounded-xl border p-3" style={{ borderColor: "var(--line)" }}>
                     <img src={i.preview} alt={i.id} className="h-20 w-20 flex-none rounded-xl object-cover" />
                     <div className="min-w-0 flex-1 space-y-2 text-sm">
+                      {i.name && (
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-bold" style={{ color: "var(--ink)" }}>
+                            {i.name}
+                          </span>
+                          {i.ornament && <span className="chip chip-gold">{i.ornament}</span>}
+                        </div>
+                      )}
                       <label className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--muted)" }}>
                         Design ID
                         <input

@@ -11,6 +11,20 @@ Live demo: https://zevar-iq.vercel.app
 
 Try it without any files: click **Try with sample data (20 photos)**, then **Analyze**.
 
+## Demo files (for showing the prototype)
+
+All in , and downloadable from the app's step 1 card:
+
+| File | What it is |
+| --- | --- |
+|  | 20 Indian designs: name, ornament type (Necklace, Choker, Kada, Bangle, Earrings, Ring, Pendant, Bracelet), purity, grams, quantity, stock-in date and karigar |
+|  | 16 sales (design_id, date, amount in rupees) |
+|  | The 20 matching photos, D01 to D20 (credits inside) |
+
+Live demo flow: upload the 20 photos, then  under *Stock list*, then  under *Sales file*, then press **Analyze**. Or just press **Try with sample data**. Either way, 6 designs (243 g of gold) show as stuck.
+
+ columns: ,  (per piece), ,  are required; , , ,  are optional.
+
 ## How it works
 
 | Step | Who does it |

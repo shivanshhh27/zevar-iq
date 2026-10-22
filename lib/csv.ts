@@ -10,7 +10,7 @@ export type CsvResult =
 const REQUIRED = ["design_id", "date", "amount"];
 
 // Splits one CSV line, respecting "quoted, values".
-function splitLine(line: string): string[] {
+export function splitLine(line: string): string[] {
   const cells: string[] = [];
   let cur = "";
   let inQuotes = false;
@@ -26,7 +26,7 @@ function splitLine(line: string): string[] {
 }
 
 // Accepts 2026-03-14 or 14/03/2026 (the Indian day-first style). Returns YYYY-MM-DD or null.
-function parseDate(raw: string): string | null {
+export function parseDate(raw: string): string | null {
   let y: number, m: number, d: number;
   let match = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
   if (match) [y, m, d] = [+match[1], +match[2], +match[3]];

@@ -5,6 +5,7 @@ import fs from "node:fs";
 import { parseSalesCsv } from "../lib/csv";
 import { analyse, StockItem } from "../lib/analysis";
 import { parseTags } from "../lib/designTags";
+import { categoryForOrnament, parseStockCsv } from "../lib/stockCsv";
 
 const tags = { isJewellery: true, category: "ring", style: "minimal", priceBand: "25k-75k", confidence: 0.9 } as const;
 const item = (id: string, grams: number, qty: number, stockIn: string): StockItem => ({
@@ -37,15 +38,71 @@ test("sales CSV: bad input gives a plain message instead of crashing", () => {
   }
 });
 
-test("sample data: 6 designs hold 70.9 g and are stuck", () => {
+test("stock list CSV: reads names, ornament types, grams, quantity and dates", () => {
+  const r = parseStockCsv("design_id,design_name,ornament_type,purity,weight_grams,quantity,stock_in_date,karigar\nD01,Lakshmi Kasu Mala,Necklace,22K,38.5,1,10/02/2025,Murugan - Coimbatore\n");
+  assert.ok(r.ok);
+  if (r.ok)
+    assert.deepEqual(r.rows, [
+      { id: "D01", name: "Lakshmi Kasu Mala", ornament: "Necklace", purity: "22K", karigar: "Murugan - Coimbatore", weightGrams: 38.5, quantity: 1, stockInDate: "2025-02-10" },
+    ]);
+});
+
+test("stock list CSV: bad input gives a plain message instead of crashing", () => {
+  const cases: [string, RegExp][] = [
+    ["", /empty/],
+    ["design_id,weight_grams,quantity\nD1,5,1", /missing these columns: stock_in_date/],
+    ["design_id,weight_grams,quantity,stock_in_date\n", /no rows/],
+    ["design_id,weight_grams,quantity,stock_in_date\nD1,-5,1,2026-01-01", /Row 2/],
+    ["design_id,weight_grams,quantity,stock_in_date\nD1,5,1.5,2026-01-01", /Row 2/],
+    ["design_id,weight_grams,quantity,stock_in_date\nD1,5,1,2026-01-01\nd1,6,1,2026-01-01", /appears twice/],
+  ];
+  for (const [text, message] of cases) {
+    const r = parseStockCsv(text);
+    assert.ok(!r.ok);
+    if (!r.ok) assert.match(r.error, message);
+  }
+});
+
+test("ornament types written the Indian way map to our categories", () => {
+  const expected: [string, string | undefined][] = [
+    ["Necklace", "necklace"],
+    ["Haar", "necklace"],
+    ["Choker", "necklace"],
+    ["Kada", "bangle"],
+    ["Churi", "bangle"],
+    ["Bangle", "bangle"],
+    ["Jhumka", "earrings"],
+    ["Earrings", "earrings"],
+    ["Ring", "ring"],
+    ["Pendant", "pendant"],
+    ["Mangalsutra", "mangalsutra"],
+    ["Bracelet", "bracelet"],
+    ["Spaceship", undefined],
+  ];
+  for (const [text, category] of expected) assert.equal(categoryForOrnament(text), category, text);
+});
+
+test("demo data: 6 designs hold 243 g and are stuck", () => {
   const dir = new URL("../public/sample/", import.meta.url);
   const csv = parseSalesCsv(fs.readFileSync(new URL("sales.csv", dir), "utf8"));
-  assert.ok(csv.ok);
-  const stock = JSON.parse(fs.readFileSync(new URL("stock.json", dir), "utf8")).map((s: StockItem) => ({ ...s, tags }));
-  if (!csv.ok) return;
+  const stockList = parseStockCsv(fs.readFileSync(new URL("designs.csv", dir), "utf8"));
+  assert.ok(csv.ok && stockList.ok);
+  if (!csv.ok || !stockList.ok) return;
+  assert.equal(stockList.rows.length, 20);
+  const stock: StockItem[] = stockList.rows.map((r) => ({
+    id: r.id,
+    weightGrams: r.weightGrams,
+    quantity: r.quantity,
+    karigar: r.karigar,
+    name: r.name,
+    ornament: r.ornament,
+    stockInDate: r.stockInDate,
+    tags,
+  }));
   const result = analyse(stock, csv.sales);
   assert.deepEqual(result.stuck.map((s) => s.id).sort(), ["D01", "D02", "D03", "D04", "D05", "D06"]);
-  assert.equal(Math.round(result.stuckGrams * 10) / 10, 70.9);
+  assert.equal(Math.round(result.stuckGrams * 10) / 10, 243);
+  assert.deepEqual(result.unmatchedSaleIds, []);
 });
 
 test("stuck rule: idle 365 days or more with stock left is stuck; 364 is not; a recent sale resets it", () => {

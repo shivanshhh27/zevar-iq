@@ -9,6 +9,8 @@ export type StockItem = {
   weightGrams: number; // per piece
   quantity: number; // pieces in stock-in
   karigar: string;
+  name?: string; // e.g. "Lakshmi Kasu Mala", from the stock list CSV
+  ornament?: string; // e.g. "Necklace", "Kada", from the stock list CSV
   stockInDate: string; // YYYY-MM-DD
   tags: DesignTags | null; // null = AI could not tag this photo yet
 };
