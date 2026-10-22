@@ -59,6 +59,8 @@ export default function Home() {
   const [running, setRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [tagging, setTagging] = useState(""); // progress text while photos are being tagged
+  const [photosOpen, setPhotosOpen] = useState(true); // the photo grid is open while setting up, and folds away once results show
+  const [tagsOpen, setTagsOpen] = useState(false);
   const [limitHit, setLimitHit] = useState(false); // true when Gemini says the free daily limit is used up
   const [reasons, setReasons] = useState<Reasons>({});
   const [reasonsState, setReasonsState] = useState<"loading" | "ai" | "fallback">("loading");
@@ -83,6 +85,7 @@ export default function Home() {
 
   // One click fills the form with the 20 sample photos, their weights and dates, and the sample sales file.
   async function loadSample() {
+    setPhotosOpen(true);
     setSales(null);
     setProblems([]);
     setTagging("");
@@ -119,6 +122,7 @@ export default function Home() {
       added.push({ id, ...small, weight: "", qty: "1", date: "", status: "waiting" });
     }
     update([...itemsRef.current, ...added]);
+    setPhotosOpen(true);
     setProblems(skipped.length ? [`These files are not photos we can read and were skipped: ${skipped.join(", ")}.`] : []);
   }
 
@@ -213,7 +217,12 @@ export default function Home() {
       else found.push(result.error);
     }
     setProblems(found);
-    if (found.length > 0 || !parsed) return;
+    if (found.length > 0 || !parsed) {
+      setPhotosOpen(true); // the fix is usually in the photo cards (weight, quantity, date)
+      return;
+    }
+    setPhotosOpen(false);
+    setTagsOpen(false);
 
     // The stuck-gold banner only needs weights, dates and sales, not the AI, so show it straight away.
     // Photo tagging then runs in the background and fills in styles and price bands as it goes.
@@ -251,24 +260,111 @@ export default function Home() {
 
   const field = "w-20 rounded border px-1 py-0.5 text-sm";
   const skipped = items.filter((i) => i.tags?.isJewellery === false);
+  const shown = items.filter((i) => i.tags?.isJewellery !== false);
+  const isPending = (i: Item) => !i.tags && (i.status === "waiting" || i.status === "tagging"); // still being tagged in the background
+  const isUnsure = (i: Item) => !isPending(i) && !i.edited && (!i.tags || i.tags.confidence < LOW_CONFIDENCE);
+  const unsureCount = analysis ? shown.filter(isUnsure).length : 0;
+  const failedCount = items.filter((i) => i.status === "failed" && !i.tags).length;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-6">
+    <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
       <header>
         <h1 className="text-2xl font-bold">DesignLedger</h1>
         <p className="text-sm text-zinc-600">Upload stock photos and your sales file. See which designs are stuck and what to reorder.</p>
       </header>
 
-      <section className="space-y-3 rounded-lg border p-4">
-        <h2 className="font-semibold">1. Stock photos</h2>
-        <div className="flex flex-wrap items-center gap-3">
-          <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
-          <button className="rounded border px-3 py-1 text-sm" onClick={loadSample} disabled={running}>
-            Try with sample data (20 photos)
-          </button>
+      <section className="space-y-4 rounded-lg border p-4">
+        <div className="space-y-2">
+          <h2 className="font-semibold">1. Stock photos</h2>
+          <div className="flex flex-wrap items-center gap-3">
+            <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
+            <button className="rounded border px-3 py-1 text-sm" onClick={loadSample} disabled={running}>
+              Try with sample data (20 photos)
+            </button>
+          </div>
+          {items.length > 0 && (
+            <p className="text-xs text-zinc-500">
+              {items.length} photos added. Set grams, quantity and stock-in date for each under &quot;Photos and details&quot; below.
+            </p>
+          )}
         </div>
-        {items.length > 0 && (
-          <ul className="grid gap-3 sm:grid-cols-2">
+
+        <div className="space-y-2">
+          <h2 className="font-semibold">2. Sales file</h2>
+          <p className="text-xs text-zinc-500">
+            CSV with columns design_id, date, amount. design_id must match the Design ID on each photo (it starts as the file name; you can edit it).
+          </p>
+          <input
+            type="file"
+            accept=".csv,text/csv"
+            onChange={async (e) => {
+              const f = e.target.files?.[0];
+              setCsvText(f ? await f.text() : null);
+              setCsvName(f?.name ?? "");
+            }}
+          />
+          {csvName && <p className="text-xs text-zinc-500">Loaded {csvName}</p>}
+        </div>
+
+        <div className="space-y-2">
+          <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-50" disabled={running} onClick={analyseAll}>
+            {running ? tagging || "Working…" : "Analyze"}
+          </button>
+          {problems.length > 0 && (
+            <ul className="list-disc rounded bg-red-50 p-3 pl-7 text-sm text-red-800">
+              {problems.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      {limitHit && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          The daily limit of the free AI plan has been reached. The stuck-gold banner and the board still work. Photos that could not be tagged can be filled in by hand under
+          &quot;Check the AI&apos;s tags&quot;, and the reasons will be basic. The limit resets every day, or you can turn on billing for your Gemini key.
+        </p>
+      )}
+
+      {skipped.length > 0 && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          The AI did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
+        </p>
+      )}
+
+      {analysis && failedCount > 0 && !running && (
+        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+          {failedCount} {failedCount === 1 ? "photo" : "photos"} could not be tagged.{" "}
+          <button
+            className="underline"
+            onClick={() => {
+              setPhotosOpen(true);
+              setTagsOpen(true);
+            }}
+          >
+            Show them
+          </button>{" "}
+          to retry, or choose the tags by hand.
+        </p>
+      )}
+
+      {analysis && (
+        <Results
+          analysis={analysis}
+          thumbs={thumbs}
+          reasons={reasons}
+          reasonsState={reasonsState}
+          tagging={tagging}
+          seconds={seconds}
+          excludedIds={skipped.map((i) => i.id)}
+        />
+      )}
+
+      {items.length > 0 && (
+        <details className="rounded-lg border p-4" open={photosOpen} onToggle={(e) => setPhotosOpen((e.target as HTMLDetailsElement).open)}>
+          <summary className="cursor-pointer font-semibold">Photos and details ({items.length})</summary>
+          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
             {items.map((i) => (
               <li key={i.id} className="flex gap-3 rounded border p-2">
                 <img src={i.preview} alt={i.id} className="h-20 w-20 rounded object-cover" />
@@ -293,106 +389,78 @@ export default function Home() {
                       Qty <input className={field} inputMode="numeric" value={i.qty} onChange={(e) => patch(i.id, { qty: e.target.value })} />
                     </label>
                     <label>
-                      Stock-in <input type="date" className="rounded border px-1 py-0.5 text-sm" value={i.date} onChange={(e) => patch(i.id, { date: e.target.value })} />
+                      Stock-in{" "}
+                      <input type="date" className="rounded border px-1 py-0.5 text-sm" value={i.date} onChange={(e) => patch(i.id, { date: e.target.value })} />
                     </label>
                   </div>
                   {i.status === "failed" && (
                     <div className="text-xs text-red-700">
-                      {i.error} <button className="underline" onClick={() => tagBatch([i])}>Retry</button>
+                      {i.error}{" "}
+                      <button className="underline" onClick={() => tagBatch([i])}>
+                        Retry
+                      </button>
                     </div>
                   )}
                 </div>
               </li>
             ))}
           </ul>
-        )}
-      </section>
-
-      <section className="space-y-2 rounded-lg border p-4">
-        <h2 className="font-semibold">2. Sales file</h2>
-        <p className="text-xs text-zinc-500">CSV with columns design_id, date, amount. design_id must match the Design ID on each photo (it starts as the file name; you can edit it).</p>
-        <input
-          type="file"
-          accept=".csv,text/csv"
-          onChange={async (e) => {
-            const f = e.target.files?.[0];
-            setCsvText(f ? await f.text() : null);
-            setCsvName(f?.name ?? "");
-          }}
-        />
-        {csvName && <p className="text-xs text-zinc-500">Loaded {csvName}</p>}
-      </section>
-
-      <div className="space-y-2">
-        <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-50" disabled={running} onClick={analyseAll}>
-          {running ? tagging || "Working…" : "Analyze"}
-        </button>
-        {problems.length > 0 && (
-          <ul className="list-disc rounded bg-red-50 p-3 pl-7 text-sm text-red-800">
-            {problems.map((p) => (
-              <li key={p}>{p}</li>
-            ))}
-          </ul>
-        )}
-      </div>
-
-      {limitHit && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          The daily limit of the free AI plan has been reached. The stuck-gold banner and the board still work. Photos that could not be tagged can be filled in by hand under
-          &quot;Check the AI&apos;s tags&quot;, and the reasons will be basic. The limit resets every day, or you can turn on billing for your Gemini key.
-        </p>
-      )}
-
-      {skipped.length > 0 && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          The AI did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
-        </p>
+        </details>
       )}
 
       {analysis && (
-        <>
-          <section className="space-y-2 rounded-lg border p-4">
-            <h2 className="font-semibold">Check the AI&apos;s tags</h2>
-            <p className="text-xs text-zinc-500">Amber means the AI was not sure. Change anything that looks wrong; results update straight away.</p>
-            <ul className="grid gap-2 sm:grid-cols-2">
-              {items.filter((i) => i.tags?.isJewellery !== false).map((i) => {
-                const pending = !i.tags && (i.status === "waiting" || i.status === "tagging"); // still being tagged in the background
-                const unsure = !pending && !i.edited && (!i.tags || i.tags.confidence < LOW_CONFIDENCE);
-                const set = (change: Partial<DesignTags>) =>
-                  patch(i.id, {
-                    edited: true,
-                    tags: { isJewellery: true, category: "other", style: "other", priceBand: PRICE_BANDS[0], confidence: 1, ...i.tags, ...change },
-                  });
-                return (
-                  <li key={i.id} className={`flex gap-2 rounded border p-2 text-xs ${unsure ? "border-amber-400 bg-amber-50" : ""}`}>
-                    <img src={i.preview} alt={i.id} className="h-14 w-14 rounded object-cover" />
-                    <div className="space-y-1">
-                      <div className="font-medium">
-                        {i.id} {pending && <span className="text-zinc-500">· tagging…</span>}{unsure && <span className="text-amber-800">· needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}</span>}
-                        {i.edited && <span className="text-zinc-500"> · edited by you</span>}
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        <select value={i.tags?.category ?? ""} onChange={(e) => set({ category: e.target.value as DesignTags["category"] })}>
-                          {!i.tags && <option value="">category?</option>}
-                          {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                        </select>
-                        <select value={i.tags?.style ?? ""} onChange={(e) => set({ style: e.target.value as DesignTags["style"] })}>
-                          {!i.tags && <option value="">style?</option>}
-                          {STYLES.map((c) => <option key={c}>{c}</option>)}
-                        </select>
-                        <select value={i.tags?.priceBand ?? ""} onChange={(e) => set({ priceBand: e.target.value as DesignTags["priceBand"] })}>
-                          {!i.tags && <option value="">price?</option>}
-                          {PRICE_BANDS.map((c) => <option key={c}>{c}</option>)}
-                        </select>
-                      </div>
+        <details className="rounded-lg border p-4" open={tagsOpen} onToggle={(e) => setTagsOpen((e.target as HTMLDetailsElement).open)}>
+          <summary className="cursor-pointer font-semibold">
+            Check the AI&apos;s tags
+            {unsureCount > 0 && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{unsureCount} need review</span>}
+          </summary>
+          <p className="mt-2 text-xs text-zinc-500">Amber means the AI was not sure. Change anything that looks wrong; results update straight away.</p>
+          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+            {shown.map((i) => {
+              const pending = isPending(i);
+              const unsure = isUnsure(i);
+              const set = (change: Partial<DesignTags>) =>
+                patch(i.id, {
+                  edited: true,
+                  tags: { isJewellery: true, category: "other", style: "other", priceBand: PRICE_BANDS[0], confidence: 1, ...i.tags, ...change },
+                });
+              return (
+                <li key={i.id} className={`flex gap-2 rounded border p-2 text-xs ${unsure ? "border-amber-400 bg-amber-50" : ""}`}>
+                  <img src={i.preview} alt={i.id} className="h-14 w-14 rounded object-cover" />
+                  <div className="space-y-1">
+                    <div className="font-medium">
+                      {i.id} {pending && <span className="text-zinc-500">· tagging…</span>}
+                      {unsure && (
+                        <span className="text-amber-800">· needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}</span>
+                      )}
+                      {i.edited && <span className="text-zinc-500"> · edited by you</span>}
                     </div>
-                  </li>
-                );
-              })}
-            </ul>
-          </section>
-          <Results analysis={analysis} thumbs={thumbs} reasons={reasons} reasonsState={reasonsState} tagging={tagging} seconds={seconds} excludedIds={skipped.map((i) => i.id)} />
-        </>
+                    <div className="flex flex-wrap gap-1">
+                      <select value={i.tags?.category ?? ""} onChange={(e) => set({ category: e.target.value as DesignTags["category"] })}>
+                        {!i.tags && <option value="">category?</option>}
+                        {CATEGORIES.map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select value={i.tags?.style ?? ""} onChange={(e) => set({ style: e.target.value as DesignTags["style"] })}>
+                        {!i.tags && <option value="">style?</option>}
+                        {STYLES.map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                      <select value={i.tags?.priceBand ?? ""} onChange={(e) => set({ priceBand: e.target.value as DesignTags["priceBand"] })}>
+                        {!i.tags && <option value="">price?</option>}
+                        {PRICE_BANDS.map((c) => (
+                          <option key={c}>{c}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        </details>
       )}
     </main>
   );

@@ -153,6 +153,24 @@ export default function Results({
         </p>
       )}
 
+      <div className="grid gap-6 sm:grid-cols-2">
+        <div>
+          <h2 className="text-lg font-semibold">Reorder ({reorder.length})</h2>
+          <ul>{reorder.map(renderItem)}</ul>
+          {reorder.length === 0 && <p className="text-sm text-zinc-500">Nothing to reorder yet.</p>}
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold">Do not reorder ({dont.length})</h2>
+          <ul>{dont.map(renderItem)}</ul>
+          {dont.length === 0 && <p className="text-sm text-zinc-500">No stuck designs.</p>}
+        </div>
+      </div>
+      <p className="text-xs text-zinc-500">
+        {reasonsState === "loading" && (tagging ? "Basic reasons shown; the AI writes better ones once all photos are tagged. " : "Asking the AI for reasons… (basic reasons shown meanwhile) ")}
+        {reasonsState === "fallback" && "The AI's reasons were not available, so basic reasons are shown. "}
+        Nothing here is sent to a karigar.
+      </p>
+
       <div className="space-y-4">
         <h2 className="text-lg font-semibold">Sell-through and ageing board</h2>
         <table className="w-full text-left text-sm">
@@ -187,23 +205,6 @@ export default function Results({
         </div>
       </div>
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <h2 className="text-lg font-semibold">Reorder ({reorder.length})</h2>
-          <ul>{reorder.map(renderItem)}</ul>
-          {reorder.length === 0 && <p className="text-sm text-zinc-500">Nothing to reorder yet.</p>}
-        </div>
-        <div>
-          <h2 className="text-lg font-semibold">Do not reorder ({dont.length})</h2>
-          <ul>{dont.map(renderItem)}</ul>
-          {dont.length === 0 && <p className="text-sm text-zinc-500">No stuck designs.</p>}
-        </div>
-      </div>
-      <p className="text-xs text-zinc-500">
-        {reasonsState === "loading" && (tagging ? "Basic reasons shown; the AI writes better ones once all photos are tagged. " : "Asking the AI for reasons… (basic reasons shown meanwhile) ")}
-        {reasonsState === "fallback" && "The AI's reasons were not available, so basic reasons are shown. "}
-        Nothing here is sent to a karigar.
-      </p>
     </section>
   );
 }
