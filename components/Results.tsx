@@ -12,7 +12,7 @@ type Placement = "reorder" | "do-not-reorder" | "removed";
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 const g = (n: number) => `${Math.round(n * 10) / 10} g`;
 
-// Plain-text reason used when Claude's reason is missing.
+// Plain-text reason used when the AI's reason is missing.
 export function basicReason(r: DesignRow): string {
   return r.stuck
     ? `No sale for ${r.idleDays} days; ${g(r.lockedGrams)} still in stock.`
@@ -100,7 +100,7 @@ export default function Results({
           <div>{reasons[r.id] ?? basicReason(r)}</div>
           <div className="text-xs text-zinc-500">
             Sold {r.sold} of {r.quantity} · idle {r.idleDays} days · {g(r.weightGrams)} each · {g(r.lockedGrams)} in stock
-            {reasons[r.id] && " · reason written by Claude"}
+            {reasons[r.id] && " · reason written by AI"}
           </div>
           <div className="mt-1 flex gap-2">
             <button className="rounded border px-2 py-0.5 text-xs" onClick={() => setApproved({ ...approved, [r.id]: !approved[r.id] })}>
@@ -186,8 +186,8 @@ export default function Results({
         </div>
       </div>
       <p className="text-xs text-zinc-500">
-        {reasonsState === "loading" && "Asking Claude for reasons… (basic reasons shown meanwhile)"}
-        {reasonsState === "fallback" && "Claude's reasons were not available, so basic reasons are shown. "}
+        {reasonsState === "loading" && "Asking the AI for reasons… (basic reasons shown meanwhile)"}
+        {reasonsState === "fallback" && "The AI's reasons were not available, so basic reasons are shown. "}
         Nothing here is sent to a karigar.
       </p>
     </section>

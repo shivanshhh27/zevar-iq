@@ -1,4 +1,4 @@
-// The fixed menu Claude must choose from when it looks at a photo.
+// The fixed menu the AI must choose from when it looks at a photo.
 // Keeping the list fixed means two similar rings get the same tags every time.
 
 export const CATEGORIES = [
@@ -35,7 +35,7 @@ export type Style = (typeof STYLES)[number];
 export type PriceBand = (typeof PRICE_BANDS)[number];
 export type WeightBand = (typeof WEIGHT_BANDS)[number];
 
-// What Claude sends back for one photo.
+// What the AI sends back for one photo.
 export type DesignTags = {
   isJewellery: boolean;
   category: Category;
@@ -46,7 +46,7 @@ export type DesignTags = {
 
 export const LOW_CONFIDENCE = 0.6;
 
-// Checks Claude's answer against the menu. Anything off-list returns null,
+// Checks the AI's answer against the menu. Anything off-list returns null,
 // so the screen shows "needs review" instead of trusting a bad answer.
 export function parseTags(raw: unknown): DesignTags | null {
   if (typeof raw !== "object" || raw === null) return null;

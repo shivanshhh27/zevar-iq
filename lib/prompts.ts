@@ -1,4 +1,4 @@
-// The two questions we ask Claude, kept in one place so they are easy to read and change.
+// The two questions we ask the AI, kept in one place so they are easy to read and change.
 
 import { CATEGORIES, STYLES, PRICE_BANDS } from "./designTags";
 

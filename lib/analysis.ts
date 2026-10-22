@@ -10,7 +10,7 @@ export type StockItem = {
   quantity: number; // pieces in stock-in
   karigar: string;
   stockInDate: string; // YYYY-MM-DD
-  tags: DesignTags | null; // null = Claude could not tag this photo yet
+  tags: DesignTags | null; // null = AI could not tag this photo yet
 };
 
 export const STUCK_DAYS = 365;

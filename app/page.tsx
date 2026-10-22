@@ -43,7 +43,7 @@ const clock = { now: () => Date.now() };
 
 const validDate = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && !Number.isNaN(Date.parse(s));
 
-// Non-jewellery photos are left out. Photos Claude failed on stay in, untagged.
+// Non-jewellery photos are left out. Photos the AI failed on stay in, untagged.
 function toStock(items: Item[]): StockItem[] {
   return items
     .filter((i) => i.tags?.isJewellery !== false)
@@ -99,7 +99,7 @@ export default function Home() {
     }
   }
 
-  // Asks Claude for a reason per design (once per run). If it fails, the screen shows basic reasons.
+  // Asks the AI for a reason per design (once per run). If it fails, the screen shows basic reasons.
   function requestReasons(result: ReturnType<typeof analyse>) {
     const lines = [...result.reorder, ...result.stuck].map((r) => ({
       id: r.id,
@@ -242,15 +242,15 @@ export default function Home() {
 
       {skipped.length > 0 && (
         <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          Claude did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
+          The AI did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
         </p>
       )}
 
       {analysis && (
         <>
           <section className="space-y-2 rounded-lg border p-4">
-            <h2 className="font-semibold">Check Claude&apos;s tags</h2>
-            <p className="text-xs text-zinc-500">Amber means Claude was not sure. Change anything that looks wrong; results update straight away.</p>
+            <h2 className="font-semibold">Check the AI&apos;s tags</h2>
+            <p className="text-xs text-zinc-500">Amber means the AI was not sure. Change anything that looks wrong; results update straight away.</p>
             <ul className="grid gap-2 sm:grid-cols-2">
               {items.filter((i) => i.tags?.isJewellery !== false).map((i) => {
                 const unsure = !i.edited && (!i.tags || i.tags.confidence < LOW_CONFIDENCE);
