@@ -147,13 +147,14 @@ export default function Home() {
 
     // Tag 5 photos at a time.
     const queue = itemsRef.current.filter((i) => !i.tags);
+    const total = queue.length;
     let done = 0;
-    setProgress(`Tagging 0 of ${queue.length}`);
+    setProgress(`Tagging 0 of ${total}`);
     await Promise.all(
       Array.from({ length: 5 }, async () => {
         for (let next = queue.shift(); next; next = queue.shift()) {
           await tagOne(next);
-          setProgress(`Tagging ${++done} of ${done + queue.length}`);
+          setProgress(`Tagging ${++done} of ${total}`);
         }
       }),
     );

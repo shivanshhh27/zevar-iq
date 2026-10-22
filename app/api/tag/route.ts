@@ -2,8 +2,21 @@
 // Receives one photo, asks Gemini to tag it, checks the answer, sends it back.
 
 import { askGemini, GeminiError } from "@/lib/gemini";
-import { parseTags } from "@/lib/designTags";
+import { CATEGORIES, PRICE_BANDS, STYLES, parseTags } from "@/lib/designTags";
 import { TAG_SYSTEM } from "@/lib/prompts";
+
+// Tells Gemini exactly which values are allowed, so it cannot invent new tags.
+const TAG_SCHEMA = {
+  type: "OBJECT",
+  properties: {
+    isJewellery: { type: "BOOLEAN" },
+    category: { type: "STRING", enum: [...CATEGORIES] },
+    style: { type: "STRING", enum: [...STYLES] },
+    priceBand: { type: "STRING", enum: [...PRICE_BANDS] },
+    confidence: { type: "NUMBER" },
+  },
+  required: ["isJewellery", "category", "style", "priceBand", "confidence"],
+};
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
@@ -29,7 +42,8 @@ export async function POST(request: Request) {
     const text = await askGemini(
       TAG_SYSTEM,
       [{ inlineData: { mimeType: body.mediaType, data: body.image } }, { text: "Tag this piece." }],
-      400,
+      600,
+      TAG_SCHEMA,
     );
     const json = text.match(/\{[\s\S]*\}/)?.[0];
     const tags = json ? parseTags(JSON.parse(json)) : null;

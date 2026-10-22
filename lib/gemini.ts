@@ -1,7 +1,9 @@
 // One small helper for talking to Gemini from our server routes.
 // Uses Gemini's plain web API, so no extra library is needed.
 
-const MODELS = [process.env.GEMINI_MODEL || "gemini-3.8-flash", "gemini-3.5-flash"]; // second is the backup when the first is busy
+// Fast models first; the second is the backup when the first is busy.
+// "Thinking" is turned down so answers come back in about a second instead of a minute.
+const MODELS = [process.env.GEMINI_MODEL || "gemini-3.5-flash", "gemini-3.5-flash-lite"];
 
 export class GeminiError extends Error {
   constructor(message: string, public status?: number) {
@@ -17,6 +19,7 @@ export async function askGemini(
   system: string,
   parts: ({ text: string } | { inlineData: { mimeType: string; data: string } })[],
   maxOutputTokens: number,
+  schema?: object, // optional: forces the answer to match this shape (including allowed values)
 ): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new GeminiError("NO_KEY");
@@ -31,7 +34,13 @@ export async function askGemini(
         body: JSON.stringify({
           systemInstruction: { parts: [{ text: system }] },
           contents: [{ role: "user", parts }],
-          generationConfig: { responseMimeType: "application/json", maxOutputTokens, temperature: 0.2 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            ...(schema ? { responseSchema: schema } : {}),
+            maxOutputTokens,
+            temperature: 0.2,
+            thinkingConfig: { thinkingLevel: "minimal" },
+          },
         }),
       });
       if (res.ok) {
