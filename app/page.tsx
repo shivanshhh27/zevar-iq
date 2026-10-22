@@ -50,6 +50,22 @@ function toStock(items: Item[]): StockItem[] {
     .map((i) => ({ id: i.id, weightGrams: Number(i.weight), quantity: Number(i.qty), karigar: "", stockInDate: i.date, tags: i.tags ?? null }));
 }
 
+// The logo mark: a faceted gem, drawn inline so it needs no image file.
+function Logo() {
+  return (
+    <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true">
+      <defs>
+        <linearGradient id="gem" x1="0" y1="0" x2="1" y2="1">
+          <stop offset="0" stopColor="#f4c76a" />
+          <stop offset="1" stopColor="#e8622c" />
+        </linearGradient>
+      </defs>
+      <path d="M8 4h16l6 8-14 17L2 12z" fill="url(#gem)" />
+      <path d="M2 12h28M11 4l5 8 5-8M16 12v17M8 4l8 8M24 4l-8 8" stroke="#fff" strokeOpacity="0.7" strokeWidth="1.1" fill="none" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export default function Home() {
   const [items, setItems] = useState<Item[]>([]);
   const [csvText, setCsvText] = useState<string | null>(null);
@@ -261,7 +277,6 @@ export default function Home() {
   const thumbs = Object.fromEntries(items.map((i) => [i.id, i.preview]));
 
 
-  const field = "w-20 rounded border px-1 py-0.5 text-sm";
   const skipped = items.filter((i) => i.tags?.isJewellery === false);
   const shown = items.filter((i) => i.tags?.isJewellery !== false);
   const isPending = (i: Item) => !i.tags && (i.status === "waiting" || i.status === "tagging"); // still being tagged in the background
@@ -270,208 +285,325 @@ export default function Home() {
   const failedCount = items.filter((i) => i.status === "failed" && !i.tags).length;
 
   return (
-    <main className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
-      <header>
-        <h1 className="text-2xl font-bold">DesignLedger</h1>
-        <p className="text-sm text-zinc-600">Upload stock photos and your sales file. See which designs are stuck and what to reorder.</p>
+    <div id="top" className="flex min-h-screen flex-col">
+      {/* Hero band with the floating header */}
+      <header className="hero">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 pt-4 sm:px-6 sm:pt-6">
+          <nav className="flex items-center justify-between rounded-2xl bg-white px-4 py-3 sm:px-6" style={{ boxShadow: "0 10px 30px rgba(0,0,0,0.18)" }} aria-label="Main">
+            <a href="#top" className="flex items-center gap-2.5">
+              <Logo />
+              <span className="text-lg tracking-tight" style={{ color: "var(--navy-900)" }}>
+                <b className="font-extrabold">Design</b>
+                <span className="font-medium">Ledger</span>
+              </span>
+            </a>
+            <div className="hidden items-center gap-8 text-sm font-semibold md:flex" style={{ color: "var(--navy-900)" }}>
+              <a href="#how" className="hover:opacity-70">
+                How it works
+              </a>
+              <a href="#try" className="hover:opacity-70">
+                Try it
+              </a>
+            </div>
+            <a href="#try" className="btn btn-primary btn-sm">
+              Try it free
+            </a>
+          </nav>
+
+          <div className="mx-auto max-w-3xl pb-28 pt-12 text-center sm:pb-36 sm:pt-20">
+            <span className="chip chip-gold">Built for independent jewellers in India</span>
+            <h1 className="mt-5 text-3xl font-extrabold leading-tight sm:text-5xl">Know which designs sell, and which ones lock up your gold.</h1>
+            <p className="mx-auto mt-4 max-w-2xl text-base sm:text-lg" style={{ color: "rgba(255,255,255,0.86)" }}>
+              Upload your stock photos and your sales file. DesignLedger shows what has not sold for 12 months and what to reorder from your karigars. You approve every decision.
+            </p>
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+              <a href="#try" className="btn btn-primary">
+                Start with sample data
+              </a>
+              <a href="#how" className="btn" style={{ background: "rgba(255,255,255,0.12)", color: "#fff", borderColor: "rgba(255,255,255,0.35)" }}>
+                How it works
+              </a>
+            </div>
+            <ul className="mt-9 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-semibold" style={{ color: "rgba(255,255,255,0.8)" }}>
+              <li>✦ Stuck-gold number in under a second</li>
+              <li>✦ AI reads every design photo</li>
+              <li>✦ Nothing is sent to karigars</li>
+            </ul>
+          </div>
+        </div>
       </header>
 
-      <section className="space-y-4 rounded-lg border p-4">
-        <div className="space-y-2">
-          <h2 className="font-semibold">1. Stock photos</h2>
-          <div className="flex flex-wrap items-center gap-3">
-            <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
-            <button className="rounded border px-3 py-1 text-sm" onClick={loadSample} disabled={running}>
-              Try with sample data (20 photos)
-            </button>
+      <main className="relative z-10 mx-auto -mt-20 w-full max-w-6xl flex-1 space-y-6 px-4 pb-16 sm:-mt-28 sm:px-6">
+        {/* The working card */}
+        <section id="try" className="card scroll-mt-6 p-5 sm:p-8">
+          <div className="grid gap-8 md:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="step-num">1</span>
+                <h2 className="text-lg font-bold">Stock photos</h2>
+              </div>
+              <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+                One photo per design. Then set grams, quantity and stock-in date for each.
+              </p>
+              <div className="mt-4 flex flex-wrap items-center gap-3">
+                <input type="file" accept="image/*" multiple onChange={(e) => addPhotos(e.target.files)} />
+                <button className="btn btn-ghost btn-sm" onClick={loadSample} disabled={running}>
+                  Try with sample data (20 photos)
+                </button>
+              </div>
+              {items.length > 0 && !csvName.includes("(sample)") && (
+                <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
+                  {items.length} photos added. Set grams, quantity and stock-in date for each under &quot;Photos and details&quot; below.
+                </p>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="step-num">2</span>
+                <h2 className="text-lg font-bold">Sales file</h2>
+              </div>
+              <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+                CSV with columns design_id, date, amount. design_id must match the Design ID on each photo (it starts as the file name; you can edit it).
+              </p>
+              <div className="mt-4">
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={async (e) => {
+                    const f = e.target.files?.[0];
+                    setCsvText(f ? await f.text() : null);
+                    setCsvName(f?.name ?? "");
+                  }}
+                />
+              </div>
+              {csvName && (
+                <p className="mt-3 text-xs font-medium" style={{ color: "var(--good)" }}>
+                  ✓ Loaded {csvName}
+                </p>
+              )}
+            </div>
           </div>
-          {items.length > 0 && !csvName.includes("(sample)") && (
-            <p className="text-xs text-zinc-500">
-              {items.length} photos added. Set grams, quantity and stock-in date for each under &quot;Photos and details&quot; below.
+
+          <div className="mt-8 flex flex-wrap items-center gap-4 border-t pt-6" style={{ borderColor: "var(--line)" }}>
+            <span className="step-num">3</span>
+            <button className="btn btn-primary" disabled={running} onClick={analyseAll}>
+              {running ? tagging || "Working…" : "Analyze"}
+            </button>
+            <p className="text-sm" style={{ color: "var(--muted)" }}>
+              The stuck-gold summary appears instantly; the AI finishes tagging a few seconds later.
             </p>
-          )}
-        </div>
-
-        <div className="space-y-2">
-          <h2 className="font-semibold">2. Sales file</h2>
-          <p className="text-xs text-zinc-500">
-            CSV with columns design_id, date, amount. design_id must match the Design ID on each photo (it starts as the file name; you can edit it).
-          </p>
-          <input
-            type="file"
-            accept=".csv,text/csv"
-            onChange={async (e) => {
-              const f = e.target.files?.[0];
-              setCsvText(f ? await f.text() : null);
-              setCsvName(f?.name ?? "");
-            }}
-          />
-          {csvName && <p className="text-xs text-zinc-500">Loaded {csvName}</p>}
-        </div>
-
-        <div className="space-y-2">
-          <button className="rounded bg-black px-4 py-2 text-white disabled:opacity-50" disabled={running} onClick={analyseAll}>
-            {running ? tagging || "Working…" : "Analyze"}
-          </button>
+          </div>
           {problems.length > 0 && (
-            <ul className="list-disc rounded bg-red-50 p-3 pl-7 text-sm text-red-800">
+            <ul className="alert alert-bad mt-5 list-disc space-y-1 pl-8">
               {problems.map((p) => (
                 <li key={p}>{p}</li>
               ))}
             </ul>
           )}
-        </div>
-      </section>
+        </section>
 
-      {noKey && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          The AI is not set up on this server yet, so photos are not tagged and the reasons are basic. The stuck-gold banner and the board still work. The site owner needs to add
-          GEMINI_API_KEY (Vercel: Settings, then Environment Variables) and redeploy.
-        </p>
-      )}
+        {noKey && (
+          <p className="alert alert-warn">
+            The AI is not set up on this server yet, so photos are not tagged and the reasons are basic. The stuck-gold banner and the board still work. The site owner needs to add
+            GEMINI_API_KEY (Vercel: Settings, then Environment Variables) and redeploy.
+          </p>
+        )}
 
-      {limitHit && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          The daily limit of the free AI plan has been reached. The stuck-gold banner and the board still work. Photos that could not be tagged can be filled in by hand under
-          &quot;Check the AI&apos;s tags&quot;, and the reasons will be basic. The limit resets every day, or you can turn on billing for your Gemini key.
-        </p>
-      )}
+        {limitHit && (
+          <p className="alert alert-warn">
+            The daily limit of the free AI plan has been reached. The stuck-gold banner and the board still work. Photos that could not be tagged can be filled in by hand under
+            &quot;Check the AI&apos;s tags&quot;, and the reasons will be basic. The limit resets every day, or you can turn on billing for your Gemini key.
+          </p>
+        )}
 
-      {skipped.length > 0 && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          The AI did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
-        </p>
-      )}
+        {skipped.length > 0 && (
+          <p className="alert alert-warn">
+            The AI did not see jewellery in: {skipped.map((i) => i.id).join(", ")}. They are left out of the results.
+          </p>
+        )}
 
-      {analysis && failedCount > 0 && !running && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          {failedCount} {failedCount === 1 ? "photo" : "photos"} could not be tagged.{" "}
-          <button
-            className="underline"
-            onClick={() => {
-              setPhotosOpen(true);
-              setTagsOpen(true);
-            }}
-          >
-            Show them
-          </button>{" "}
-          to retry, or choose the tags by hand.
-        </p>
-      )}
+        {analysis && failedCount > 0 && !running && (
+          <p className="alert alert-warn">
+            {failedCount} {failedCount === 1 ? "photo" : "photos"} could not be tagged.{" "}
+            <button
+              className="font-bold underline"
+              onClick={() => {
+                setPhotosOpen(true);
+                setTagsOpen(true);
+              }}
+            >
+              Show them
+            </button>{" "}
+            to retry, or choose the tags by hand.
+          </p>
+        )}
 
-      {analysis && (
-        <Results
-          analysis={analysis}
-          thumbs={thumbs}
-          reasons={reasons}
-          reasonsState={reasonsState}
-          tagging={tagging}
-          seconds={seconds}
-          excludedIds={skipped.map((i) => i.id)}
-        />
-      )}
+        {analysis && (
+          <Results
+            analysis={analysis}
+            thumbs={thumbs}
+            reasons={reasons}
+            reasonsState={reasonsState}
+            tagging={tagging}
+            seconds={seconds}
+            excludedIds={skipped.map((i) => i.id)}
+          />
+        )}
 
-      {items.length > 0 && (
-        <details className="rounded-lg border p-4" open={photosOpen} onToggle={(e) => setPhotosOpen((e.target as HTMLDetailsElement).open)}>
-          <summary className="cursor-pointer font-semibold">Photos and details ({items.length})</summary>
-          <ul className="mt-3 grid gap-3 sm:grid-cols-2">
-            {items.map((i) => (
-              <li key={i.id} className="flex gap-3 rounded border p-2">
-                <img src={i.preview} alt={i.id} className="h-20 w-20 rounded object-cover" />
-                <div className="flex-1 space-y-1 text-sm">
-                  <label className="block">
-                    Design ID{" "}
-                    <input
-                      key={i.id}
-                      className="w-24 rounded border px-1 py-0.5 text-sm font-medium"
-                      defaultValue={i.id}
-                      onBlur={(e) => {
-                        renameId(i.id, e.target.value);
-                        e.target.value = i.id;
-                      }}
-                    />
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    <label>
-                      Grams <input className={field} inputMode="decimal" value={i.weight} onChange={(e) => patch(i.id, { weight: e.target.value })} />
+        {items.length > 0 && (
+          <details className="card p-5" open={photosOpen} onToggle={(e) => setPhotosOpen((e.target as HTMLDetailsElement).open)}>
+            <summary>Photos and details ({items.length})</summary>
+            <ul className="mt-4 grid gap-3 md:grid-cols-2">
+              {items.map((i) => (
+                <li key={i.id} className="flex gap-3 rounded-xl border p-3" style={{ borderColor: "var(--line)" }}>
+                  <img src={i.preview} alt={i.id} className="h-20 w-20 flex-none rounded-xl object-cover" />
+                  <div className="min-w-0 flex-1 space-y-2 text-sm">
+                    <label className="flex items-center gap-2 text-xs font-semibold" style={{ color: "var(--muted)" }}>
+                      Design ID
+                      <input
+                        key={i.id}
+                        className="input w-28 font-bold"
+                        defaultValue={i.id}
+                        onBlur={(e) => {
+                          renameId(i.id, e.target.value);
+                          e.target.value = i.id;
+                        }}
+                      />
                     </label>
-                    <label>
-                      Qty <input className={field} inputMode="numeric" value={i.qty} onChange={(e) => patch(i.id, { qty: e.target.value })} />
-                    </label>
-                    <label>
-                      Stock-in{" "}
-                      <input type="date" className="rounded border px-1 py-0.5 text-sm" value={i.date} onChange={(e) => patch(i.id, { date: e.target.value })} />
-                    </label>
-                  </div>
-                  {i.status === "failed" && (
-                    <div className="text-xs text-red-700">
-                      {i.error}{" "}
-                      <button className="underline" onClick={() => tagBatch([i])}>
-                        Retry
-                      </button>
+                    <div className="flex flex-wrap gap-x-3 gap-y-2 text-xs font-semibold" style={{ color: "var(--muted)" }}>
+                      <label className="flex items-center gap-1.5">
+                        Grams
+                        <input className="input w-16" inputMode="decimal" value={i.weight} onChange={(e) => patch(i.id, { weight: e.target.value })} />
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        Qty
+                        <input className="input w-14" inputMode="numeric" value={i.qty} onChange={(e) => patch(i.id, { qty: e.target.value })} />
+                      </label>
+                      <label className="flex items-center gap-1.5">
+                        Stock-in
+                        <input type="date" className="input" value={i.date} onChange={(e) => patch(i.id, { date: e.target.value })} />
+                      </label>
                     </div>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-
-      {analysis && (
-        <details className="rounded-lg border p-4" open={tagsOpen} onToggle={(e) => setTagsOpen((e.target as HTMLDetailsElement).open)}>
-          <summary className="cursor-pointer font-semibold">
-            Check the AI&apos;s tags
-            {unsureCount > 0 && <span className="ml-2 rounded bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-900">{unsureCount} need review</span>}
-          </summary>
-          <p className="mt-2 text-xs text-zinc-500">Amber means the AI was not sure. Change anything that looks wrong; results update straight away.</p>
-          <ul className="mt-2 grid gap-2 sm:grid-cols-2">
-            {shown.map((i) => {
-              const pending = isPending(i);
-              const unsure = isUnsure(i);
-              const set = (change: Partial<DesignTags>) =>
-                patch(i.id, {
-                  edited: true,
-                  tags: { isJewellery: true, category: "other", style: "other", priceBand: PRICE_BANDS[0], confidence: 1, ...i.tags, ...change },
-                });
-              return (
-                <li key={i.id} className={`flex gap-2 rounded border p-2 text-xs ${unsure ? "border-amber-400 bg-amber-50" : ""}`}>
-                  <img src={i.preview} alt={i.id} className="h-14 w-14 rounded object-cover" />
-                  <div className="space-y-1">
-                    <div className="font-medium">
-                      {i.id} {pending && <span className="text-zinc-500">· tagging…</span>}
-                      {unsure && (
-                        <span className="text-amber-800">· needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}</span>
-                      )}
-                      {i.edited && <span className="text-zinc-500"> · edited by you</span>}
-                    </div>
-                    <div className="flex flex-wrap gap-1">
-                      <select value={i.tags?.category ?? ""} onChange={(e) => set({ category: e.target.value as DesignTags["category"] })}>
-                        {!i.tags && <option value="">category?</option>}
-                        {CATEGORIES.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                      <select value={i.tags?.style ?? ""} onChange={(e) => set({ style: e.target.value as DesignTags["style"] })}>
-                        {!i.tags && <option value="">style?</option>}
-                        {STYLES.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                      <select value={i.tags?.priceBand ?? ""} onChange={(e) => set({ priceBand: e.target.value as DesignTags["priceBand"] })}>
-                        {!i.tags && <option value="">price?</option>}
-                        {PRICE_BANDS.map((c) => (
-                          <option key={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
+                    {i.status === "failed" && (
+                      <div className="text-xs font-medium" style={{ color: "var(--bad)" }}>
+                        {i.error}{" "}
+                        <button className="font-bold underline" onClick={() => tagBatch([i])}>
+                          Retry
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </li>
-              );
-            })}
-          </ul>
-        </details>
-      )}
-    </main>
+              ))}
+            </ul>
+          </details>
+        )}
+
+        {analysis && (
+          <details className="card p-5" open={tagsOpen} onToggle={(e) => setTagsOpen((e.target as HTMLDetailsElement).open)}>
+            <summary>
+              Check the AI&apos;s tags
+              {unsureCount > 0 && <span className="chip chip-warn">{unsureCount} need review</span>}
+            </summary>
+            <p className="mt-3 text-xs" style={{ color: "var(--muted)" }}>
+              Amber means the AI was not sure. Change anything that looks wrong; results update straight away.
+            </p>
+            <ul className="mt-3 grid gap-3 md:grid-cols-2">
+              {shown.map((i) => {
+                const pending = isPending(i);
+                const unsure = isUnsure(i);
+                const set = (change: Partial<DesignTags>) =>
+                  patch(i.id, {
+                    edited: true,
+                    tags: { isJewellery: true, category: "other", style: "other", priceBand: PRICE_BANDS[0], confidence: 1, ...i.tags, ...change },
+                  });
+                return (
+                  <li
+                    key={i.id}
+                    className="flex gap-3 rounded-xl border p-3 text-xs"
+                    style={{ borderColor: unsure ? "#e8c46a" : "var(--line)", background: unsure ? "var(--warn-soft)" : "#fff" }}
+                  >
+                    <img src={i.preview} alt={i.id} className="h-14 w-14 flex-none rounded-xl object-cover" />
+                    <div className="min-w-0 space-y-1.5">
+                      <div className="font-bold" style={{ color: "var(--ink)" }}>
+                        {i.id} {pending && <span className="font-medium" style={{ color: "var(--muted)" }}>· tagging…</span>}
+                        {unsure && (
+                          <span className="font-semibold" style={{ color: "var(--warn)" }}>
+                            · needs review{i.tags ? ` (${Math.round(i.tags.confidence * 100)}% sure)` : " (not tagged)"}
+                          </span>
+                        )}
+                        {i.edited && <span className="font-medium" style={{ color: "var(--muted)" }}> · edited by you</span>}
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        <select className="input" value={i.tags?.category ?? ""} onChange={(e) => set({ category: e.target.value as DesignTags["category"] })}>
+                          {!i.tags && <option value="">category?</option>}
+                          {CATEGORIES.map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                        <select className="input" value={i.tags?.style ?? ""} onChange={(e) => set({ style: e.target.value as DesignTags["style"] })}>
+                          {!i.tags && <option value="">style?</option>}
+                          {STYLES.map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                        <select className="input" value={i.tags?.priceBand ?? ""} onChange={(e) => set({ priceBand: e.target.value as DesignTags["priceBand"] })}>
+                          {!i.tags && <option value="">price?</option>}
+                          {PRICE_BANDS.map((c) => (
+                            <option key={c}>{c}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </details>
+        )}
+
+        {/* How it works */}
+        <section id="how" className="scroll-mt-6 pt-10">
+          <div className="mx-auto max-w-2xl text-center">
+            <span className="chip chip-gold">How it works</span>
+            <h2 className="mt-3 text-2xl font-extrabold sm:text-3xl">From photo to reorder list in three steps</h2>
+            <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+              AI is used only where the input is fuzzy: reading a design from a photo, and explaining a pick. Everything else is plain arithmetic you can check.
+            </p>
+          </div>
+          <div className="mt-8 grid gap-5 md:grid-cols-3">
+            {[
+              { n: "1", t: "AI reads each design", d: "Each photo is tagged with a category, style and price band from a fixed list, and anything it is unsure about is flagged for you." },
+              { n: "2", t: "Plain maths finds stuck stock", d: "Your sales file is matched to designs. Anything unsold for 12 months with stock left is stuck, and its gold is added up." },
+              { n: "3", t: "You decide what to reorder", d: "You get a reorder list and a do-not-reorder list with a reason for each. Approve or edit every item. Nothing is sent to a karigar." },
+            ].map((s) => (
+              <div key={s.n} className="card p-6">
+                <span className="step-num" style={{ background: "var(--gold)" }}>
+                  {s.n}
+                </span>
+                <h3 className="mt-4 text-base font-bold">{s.t}</h3>
+                <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+                  {s.d}
+                </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      <footer className="mt-auto" style={{ background: "var(--navy-900)", color: "rgba(255,255,255,0.75)" }}>
+        <div className="mx-auto flex w-full max-w-6xl flex-wrap items-center justify-between gap-4 px-4 py-8 text-xs sm:px-6">
+          <div className="flex items-center gap-2.5">
+            <Logo />
+            <span className="text-sm font-semibold text-white">DesignLedger</span>
+            <span>· A hackathon MVP for independent jewellers</span>
+          </div>
+          <a href="/sample/photos/CREDITS.md" className="underline hover:text-white">
+            Sample photo credits (Wikimedia Commons)
+          </a>
+        </div>
+      </footer>
+    </div>
   );
 }

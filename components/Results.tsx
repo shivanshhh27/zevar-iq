@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable @next/next/no-img-element -- previews are in-memory data URLs, so next/image does not apply */
 
-// Everything shown after "Analyze": banner, board, and the two lists.
+// Everything shown after "Analyze": summary, the two lists, and the board.
 
 import { useState } from "react";
 import { Analysis, DesignRow, BoardGroup, STUCK_DAYS } from "@/lib/analysis";
@@ -19,46 +19,58 @@ export function basicReason(r: DesignRow): string {
     : `Sold ${r.sold} of ${r.quantity}; last sale ${r.lastSaleDate}.`;
 }
 
-function Badge({ children, tone }: { children: React.ReactNode; tone: "red" | "green" | "amber" | "grey" }) {
-  const colours = {
-    red: "bg-red-100 text-red-800",
-    green: "bg-green-100 text-green-800",
-    amber: "bg-amber-100 text-amber-900",
-    grey: "bg-zinc-100 text-zinc-700",
-  };
-  return <span className={`rounded px-2 py-0.5 text-xs font-medium ${colours[tone]}`}>{children}</span>;
+function Chip({ children, tone }: { children: React.ReactNode; tone: "bad" | "good" | "plain" }) {
+  return <span className={`chip ${tone === "bad" ? "chip-bad" : tone === "good" ? "chip-good" : ""}`}>{children}</span>;
+}
+
+function Tile({ label, value, tone }: { label: string; value: string; tone?: "bad" | "good" | "gold" }) {
+  const colour = tone === "bad" ? "var(--bad)" : tone === "good" ? "var(--good)" : tone === "gold" ? "#a87a24" : "var(--navy-900)";
+  return (
+    <div className="rounded-2xl border p-4" style={{ borderColor: "var(--line)", background: "#fbfcfe" }}>
+      <div className="text-3xl font-bold tracking-tight" style={{ color: colour }}>
+        {value}
+      </div>
+      <div className="mt-1 text-xs font-semibold uppercase tracking-wider" style={{ color: "var(--muted)" }}>
+        {label}
+      </div>
+    </div>
+  );
 }
 
 function GroupTable({ title, groups }: { title: string; groups: BoardGroup[] }) {
   return (
-    <div>
-      <h3 className="mb-1 text-sm font-semibold">{title}</h3>
-      <table className="w-full text-left text-sm">
-        <thead className="text-xs text-zinc-500">
-          <tr>
-            <th className="py-1">Group</th>
-            <th>Designs</th>
-            <th>Sold / pieces</th>
-            <th>Sell-through</th>
-            <th>Avg age</th>
-            <th>Stuck</th>
-          </tr>
-        </thead>
-        <tbody>
-          {groups.map((x) => (
-            <tr key={x.key} className="border-t">
-              <td className="py-1">{x.key}</td>
-              <td>{x.designs}</td>
-              <td>
-                {x.sold} / {x.pieces}
-              </td>
-              <td>{pct(x.sellThrough)}</td>
-              <td>{x.avgAgeDays} days</td>
-              <td>{x.stuckDesigns}</td>
+    <div className="card overflow-hidden">
+      <h3 className="px-4 pt-4 pb-2 text-sm font-bold">{title}</h3>
+      <div className="overflow-x-auto">
+        <table className="table">
+          <thead>
+            <tr>
+              <th>Group</th>
+              <th>Designs</th>
+              <th>Sold / pieces</th>
+              <th>Sell-through</th>
+              <th>Avg age</th>
+              <th>Stuck</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {groups.map((x) => (
+              <tr key={x.key}>
+                <td className="font-semibold" style={{ color: "var(--ink)" }}>
+                  {x.key}
+                </td>
+                <td>{x.designs}</td>
+                <td>
+                  {x.sold} / {x.pieces}
+                </td>
+                <td>{pct(x.sellThrough)}</td>
+                <td>{x.avgAgeDays} days</td>
+                <td>{x.stuckDesigns > 0 ? <Chip tone="bad">{x.stuckDesigns}</Chip> : x.stuckDesigns}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -94,32 +106,49 @@ export default function Results({
   const noPhoto = analysis.unmatchedSaleIds.filter((id) => !excludedIds.includes(id));
   const notJewellery = analysis.unmatchedSaleIds.filter((id) => excludedIds.includes(id));
 
+  const nothingStuck = analysis.stuck.length === 0;
+  const selling = analysis.rows.filter((r) => !r.stuck && r.sellThrough >= 0.5).length;
+  const months = Math.round(STUCK_DAYS / 30);
+
   const renderItem = (r: DesignRow) => {
     const here = listOf(r);
     return (
-      <li key={r.id} className="flex gap-3 border-t py-2">
-        {thumbs[r.id] && <img src={thumbs[r.id]} alt={r.id} className="h-14 w-14 rounded object-cover" />}
-        <div className="flex-1 text-sm">
-          <div className="font-medium">
-            {r.id} {r.tags && <span className="font-normal text-zinc-500">· {r.tags.category}, {r.tags.style}</span>}
-            {approved[r.id] && <span className="ml-2"><Badge tone="green">Approved</Badge></span>}
+      <li key={r.id} className="flex gap-3 border-t py-3 first:border-t-0" style={{ borderColor: "var(--line)" }}>
+        {thumbs[r.id] ? (
+          <img src={thumbs[r.id]} alt={r.id} className="h-16 w-16 flex-none rounded-xl object-cover" style={{ boxShadow: "0 0 0 1px var(--line)" }} />
+        ) : (
+          <div className="h-16 w-16 flex-none rounded-xl" style={{ background: "var(--line)" }} />
+        )}
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-bold" style={{ color: "var(--ink)" }}>
+              {r.id}
+            </span>
+            {r.tags && (
+              <span className="text-xs font-medium" style={{ color: "var(--muted)" }}>
+                · {r.tags.category}, {r.tags.style}
+              </span>
+            )}
+            {approved[r.id] && <Chip tone="good">Approved</Chip>}
           </div>
-          <div>{reasons[r.id] ?? basicReason(r)}</div>
-          <div className="text-xs text-zinc-500">
+          <p className="mt-0.5 text-sm" style={{ color: "var(--text)" }}>
+            {reasons[r.id] ?? basicReason(r)}
+          </p>
+          <p className="mt-1 text-xs" style={{ color: "var(--muted)" }}>
             Sold {r.sold} of {r.quantity} · idle {r.idleDays} days · {g(r.weightGrams)} each · {g(r.lockedGrams)} in stock
             {reasons[r.id] && " · reason written by AI"}
-          </div>
-          <div className="mt-1 flex gap-2">
-            <button className="rounded border px-2 py-0.5 text-xs" onClick={() => setApproved({ ...approved, [r.id]: !approved[r.id] })}>
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button className="btn btn-ghost btn-sm" onClick={() => setApproved({ ...approved, [r.id]: !approved[r.id] })}>
               {approved[r.id] ? "Undo approve" : "Approve"}
             </button>
             <button
-              className="rounded border px-2 py-0.5 text-xs"
+              className="btn btn-ghost btn-sm"
               onClick={() => setPlacement({ ...placement, [r.id]: here === "reorder" ? "do-not-reorder" : "reorder" })}
             >
               Edit: move to {here === "reorder" ? "do-not-reorder" : "reorder"}
             </button>
-            <button className="rounded border px-2 py-0.5 text-xs" onClick={() => setPlacement({ ...placement, [r.id]: "removed" })}>
+            <button className="btn btn-ghost btn-sm" onClick={() => setPlacement({ ...placement, [r.id]: "removed" })}>
               Edit: remove
             </button>
           </div>
@@ -129,82 +158,110 @@ export default function Results({
   };
 
   return (
-    <section className="space-y-6">
-      <div className={`rounded-lg border-2 p-4 ${analysis.stuck.length > 0 ? "border-red-200 bg-red-50" : "border-green-200 bg-green-50"}`}>
-        <p className="text-lg font-semibold">
-          {analysis.stuck.length === 0
-            ? `No design has gone unsold for ${Math.round(STUCK_DAYS / 30)} months, so no gold is stuck in this stock.`
-            : `${analysis.stuck.length} ${analysis.stuck.length === 1 ? "design holds" : "designs hold"} ${g(analysis.stuckGrams)} of gold and ${analysis.stuck.length === 1 ? "hasn't" : "haven't"} sold in ${Math.round(STUCK_DAYS / 30)} months.`}
-        </p>
-        <p className="text-sm text-zinc-600">
-          Based only on the sales file you uploaded (up to {analysis.asOf}). Check the stock in your shop before acting.{" "}
-          {tagging ? `${tagging}… the board below fills in as photos are tagged.` : `Photos tagged in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`}
-        </p>
+    <section id="results" className="space-y-6 scroll-mt-6">
+      {/* Summary */}
+      <div className="card overflow-hidden">
+        <div className="h-1.5" style={{ background: nothingStuck ? "var(--good)" : "linear-gradient(90deg, var(--bad), var(--brand))" }} />
+        <div className="p-5 sm:p-7">
+          <span className={`chip ${nothingStuck ? "chip-good" : "chip-bad"}`}>{nothingStuck ? "All clear" : "Gold is locked in unsold designs"}</span>
+          <h2 className="mt-3 max-w-3xl text-xl font-bold leading-snug sm:text-2xl">
+            {nothingStuck
+              ? `No design has gone unsold for ${months} months, so no gold is stuck in this stock.`
+              : `${analysis.stuck.length} ${analysis.stuck.length === 1 ? "design holds" : "designs hold"} ${g(analysis.stuckGrams)} of gold and ${analysis.stuck.length === 1 ? "hasn't" : "haven't"} sold in ${months} months.`}
+          </h2>
+          <p className="mt-2 text-sm" style={{ color: "var(--muted)" }}>
+            Based only on the sales file you uploaded (up to {analysis.asOf}). Check the stock in your shop before acting.{" "}
+            {tagging ? `${tagging}… the board below fills in as photos are tagged.` : `Photos tagged in ${seconds} ${seconds === 1 ? "second" : "seconds"}.`}
+          </p>
+          <div className="mt-5 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            <Tile label="Designs stuck" value={String(analysis.stuck.length)} tone={nothingStuck ? "good" : "bad"} />
+            <Tile label="Gold locked" value={g(analysis.stuckGrams)} tone={nothingStuck ? "good" : "gold"} />
+            <Tile label="Designs selling" value={String(selling)} tone="good" />
+            <Tile label="Designs analysed" value={String(analysis.rows.length)} />
+          </div>
+        </div>
       </div>
 
       {noPhoto.length > 0 && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
+        <p className="alert alert-warn">
           These design_id values in the sales file match none of your photos, so they were ignored: {noPhoto.join(", ")}.
         </p>
       )}
       {notJewellery.length > 0 && (
-        <p className="rounded bg-amber-50 p-3 text-sm text-amber-900">
-          Sales for {notJewellery.join(", ")} were ignored because the AI did not see jewellery in that photo.
-        </p>
+        <p className="alert alert-warn">Sales for {notJewellery.join(", ")} were ignored because the AI did not see jewellery in that photo.</p>
       )}
 
-      <div className="grid gap-6 sm:grid-cols-2">
-        <div>
-          <h2 className="text-lg font-semibold">Reorder ({reorder.length})</h2>
-          <ul>{reorder.map(renderItem)}</ul>
-          {reorder.length === 0 && <p className="text-sm text-zinc-500">Nothing to reorder yet.</p>}
+      {/* The two lists */}
+      <div className="grid gap-6 lg:grid-cols-2">
+        <div className="card overflow-hidden">
+          <div className="h-1.5" style={{ background: "var(--good)" }} />
+          <div className="p-5">
+            <h2 className="text-lg font-bold">Reorder ({reorder.length})</h2>
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
+              Selling well and not stuck. Best sellers first.
+            </p>
+            <ul className="mt-2">{reorder.map(renderItem)}</ul>
+            {reorder.length === 0 && <p className="py-4 text-sm" style={{ color: "var(--muted)" }}>Nothing to reorder yet.</p>}
+          </div>
         </div>
-        <div>
-          <h2 className="text-lg font-semibold">Do not reorder ({dont.length})</h2>
-          <ul>{dont.map(renderItem)}</ul>
-          {dont.length === 0 && <p className="text-sm text-zinc-500">No stuck designs.</p>}
+        <div className="card overflow-hidden">
+          <div className="h-1.5" style={{ background: "var(--bad)" }} />
+          <div className="p-5">
+            <h2 className="text-lg font-bold">Do not reorder ({dont.length})</h2>
+            <p className="text-xs" style={{ color: "var(--muted)" }}>
+              Unsold for {months} months or more, with stock still on the shelf. Heaviest first.
+            </p>
+            <ul className="mt-2">{dont.map(renderItem)}</ul>
+            {dont.length === 0 && <p className="py-4 text-sm" style={{ color: "var(--muted)" }}>No stuck designs.</p>}
+          </div>
         </div>
       </div>
-      <p className="text-xs text-zinc-500">
+      <p className="text-xs" style={{ color: "var(--muted)" }}>
         {reasonsState === "loading" && (tagging ? "Basic reasons shown; the AI writes better ones once all photos are tagged. " : "Asking the AI for reasons… (basic reasons shown meanwhile) ")}
         {reasonsState === "fallback" && "The AI's reasons were not available, so basic reasons are shown. "}
         Nothing here is sent to a karigar.
       </p>
 
+      {/* The board */}
       <div className="space-y-4">
-        <h2 className="text-lg font-semibold">Sell-through and ageing board</h2>
-        <table className="w-full text-left text-sm">
-          <thead className="text-xs text-zinc-500">
-            <tr>
-              <th className="py-1">Design</th>
-              <th>Weight</th>
-              <th>Sold / qty</th>
-              <th>Age</th>
-              <th>Idle</th>
-              <th>Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {analysis.rows.map((r) => (
-              <tr key={r.id} className="border-t">
-                <td className="py-1">{r.id}</td>
-                <td>{g(r.weightGrams)}</td>
-                <td>
-                  {r.sold} / {r.quantity}
-                </td>
-                <td>{r.ageDays} d</td>
-                <td>{r.idleDays} d</td>
-                <td>{r.stuck ? <Badge tone="red">Stuck</Badge> : r.sellThrough >= 0.5 ? <Badge tone="green">Selling</Badge> : <Badge tone="grey">Slow</Badge>}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        <div className="grid gap-6 sm:grid-cols-2">
+        <h2 className="text-lg font-bold">Sell-through and ageing board</h2>
+        <div className="card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>Design</th>
+                  <th>Weight</th>
+                  <th>Sold / qty</th>
+                  <th>Age</th>
+                  <th>Idle</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {analysis.rows.map((r) => (
+                  <tr key={r.id}>
+                    <td className="font-bold" style={{ color: "var(--ink)" }}>
+                      {r.id}
+                    </td>
+                    <td>{g(r.weightGrams)}</td>
+                    <td>
+                      {r.sold} / {r.quantity}
+                    </td>
+                    <td>{r.ageDays} d</td>
+                    <td>{r.idleDays} d</td>
+                    <td>{r.stuck ? <Chip tone="bad">Stuck</Chip> : r.sellThrough >= 0.5 ? <Chip tone="good">Selling</Chip> : <Chip tone="plain">Slow</Chip>}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="grid gap-6 lg:grid-cols-2">
           <GroupTable title="By weight band" groups={analysis.byWeightBand} />
           <GroupTable title="By price band" groups={analysis.byPriceBand} />
         </div>
       </div>
-
     </section>
   );
 }
