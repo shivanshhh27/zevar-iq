@@ -6,6 +6,7 @@ import { parseSalesCsv } from "../lib/csv";
 import { analyse, StockItem } from "../lib/analysis";
 import { parseTags } from "../lib/designTags";
 import { categoryForOrnament, parseStockCsv } from "../lib/stockCsv";
+import { billProblem, billToSale, makeBill } from "../lib/billing";
 
 const tags = { isJewellery: true, category: "ring", style: "minimal", priceBand: "25k-75k", confidence: 0.9 } as const;
 const item = (id: string, grams: number, qty: number, stockIn: string): StockItem => ({
@@ -144,4 +145,16 @@ test("AI answers: off-list values are rejected, valid ones kept", () => {
   assert.equal(parseTags("nonsense"), null);
   assert.ok(parseTags({ isJewellery: true, category: "ring", style: "minimal", priceBand: "25k-75k", confidence: 0.9 }));
   assert.equal(parseTags({ isJewellery: false, confidence: 2 })?.confidence, 1); // confidence is clamped to 0..1
+});
+
+test("a bill adds gold, making charge and 3% GST, and becomes one sale for its design", () => {
+  const b = makeBill({ designId: "D01", date: "2026-10-23", grams: 10, rate: 7000, makingPercent: 10 });
+  assert.equal(b.gold, 70000);
+  assert.equal(b.making, 7000);
+  assert.equal(b.gst, 2310); // 3% of 77000
+  assert.equal(b.total, 79310);
+  assert.deepEqual(billToSale(b), { designId: "D01", date: "2026-10-23", amount: 79310 });
+  assert.ok(billProblem({ designId: "", date: "2026-10-23", grams: 10, rate: 7000, makingPercent: 10 }));
+  assert.ok(billProblem({ designId: "D01", date: "2026-10-23", grams: 0, rate: 7000, makingPercent: 10 }));
+  assert.equal(billProblem({ designId: "D01", date: "2026-10-23", grams: 10, rate: 7000, makingPercent: 0 }), null);
 });

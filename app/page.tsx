@@ -9,6 +9,8 @@ import { analyse, StockItem } from "@/lib/analysis";
 import { parseSalesCsv, SaleRow } from "@/lib/csv";
 import { Category, CATEGORIES, DesignTags, LOW_CONFIDENCE, PRICE_BANDS, STYLES } from "@/lib/designTags";
 import { categoryForOrnament, parseStockCsv, StockRow } from "@/lib/stockCsv";
+import { Bill, billToSale } from "@/lib/billing";
+import Billing from "@/components/Billing";
 
 type Item = {
   id: string; // file name without extension; must match design_id in the sales file
@@ -158,6 +160,7 @@ export default function Home() {
   const [csvText, setCsvText] = useState<string | null>(null);
   const [csvName, setCsvName] = useState("");
   const [sales, setSales] = useState<SaleRow[] | null>(null);
+  const [bills, setBills] = useState<Bill[]>([]); // sales made in the billing card; they count as sales in the analysis
   const [problems, setProblems] = useState<string[]>([]);
   const [running, setRunning] = useState(false);
   const [seconds, setSeconds] = useState(0);
@@ -389,7 +392,7 @@ export default function Home() {
     setNoKey(false);
     const found: string[] = [];
     if (items.length === 0) found.push("Add at least one photo.");
-    if (csvText === null) found.push("Add the sales file (CSV).");
+    if (csvText === null && bills.length === 0) found.push("Add the sales file (CSV), or make at least one bill.");
     for (const i of items) {
       if (!(Number(i.weight) > 0)) found.push(`${i.id}: enter the weight in grams.`);
       if (!(Number.isInteger(Number(i.qty)) && Number(i.qty) >= 1)) found.push(`${i.id}: quantity must be a whole number, 1 or more.`);
@@ -400,7 +403,7 @@ export default function Home() {
       const result = parseSalesCsv(csvText);
       if (result.ok) parsed = result.sales;
       else found.push(result.error);
-    }
+    } else if (bills.length > 0) parsed = []; // bills alone are enough
     setProblems(found);
     if (found.length > 0 || !parsed) {
       setPhotosOpen(true); // the fix is usually in the photo cards (weight, quantity, date)
@@ -436,10 +439,11 @@ export default function Home() {
     setTagging("");
     setSeconds(Math.round((clock.now() - start) / 1000));
     setRunning(false);
-    requestReasons(analyse(toStock(itemsRef.current), parsed));
+    requestReasons(analyse(toStock(itemsRef.current), [...parsed, ...bills.map(billToSale)]));
   }
 
-  const analysis = useMemo(() => (sales ? analyse(toStock(items), sales) : null), [sales, items]);
+  // The sales file plus any bills made in the billing card.
+  const analysis = useMemo(() => (sales ? analyse(toStock(items), [...sales, ...bills.map(billToSale)]) : null), [sales, bills, items]);
   const thumbs = Object.fromEntries(items.map((i) => [i.id, i.preview]));
 
 
@@ -698,6 +702,13 @@ export default function Home() {
               excludedIds={skipped.map((i) => i.id)}
             />
           )}
+
+          <Billing
+            designs={items.filter((i) => i.tags?.isJewellery !== false).map((i) => ({ id: i.id, name: i.name, ornament: i.ornament, weight: i.weight, preview: i.preview }))}
+            bills={bills}
+            onAdd={(b) => setBills((prev) => [...prev, b])}
+            onRemove={(n) => setBills((prev) => prev.filter((_, k) => k !== n))}
+          />
 
           {items.length > 0 && (
             <details className="card p-5" open={photosOpen} onToggle={(e) => setPhotosOpen((e.target as HTMLDetailsElement).open)}>
